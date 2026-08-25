@@ -24,18 +24,28 @@ verify_payment.py — 估驗計價逐項核算引擎。
     （cross-period 需要兩份檔案才能比對銜接：前一期「累計至本期」應等於本期「前期累計」，
     所以順序一定是「前一期在前、本期在後」，不要顛倒）。
 
+exit code：
+    0 = 已跑的檢查全數相符
+    1 = 有異常
+    2 = 有檢查因欄位不齊被略過（**不可當成「全部相符」**）
+    3 = 檔案不存在／分頁名稱錯／版型偵測失敗，根本沒跑成
+
 設計原則：AI 不重算任何數字——所有數字都是這支腳本用 openpyxl 讀出來、用 Python
 算出來的，Claude 只負責讀腳本輸出、翻譯成人話、決定下一步。
 """
 import argparse
 import re
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 import openpyxl
+from openpyxl.utils import column_index_from_string
 
 sys.path.insert(0, str(Path(__file__).parent))
 from render_excel import render_display  # noqa: E402
+
+__version__ = '1.1.0'  # 2026-08-25
 
 GROUP_NAMES = ['原契約', '原派工', '第一次變更設計', '第一次變更設計(議價前)', '前期累計', '本期完成', '累計至本期']
 GROUP_SYNONYMS = {'原派工': '原契約'}  # 不同期的檔案可能對同一個群組用不同標題文字
@@ -45,6 +55,11 @@ NAME_HEADER_CANDIDATES = ['工程項目', '項目名稱', '名稱']
 
 
 class LayoutError(Exception):
+    pass
+
+
+class InputError(Exception):
+    """檔案不存在、分頁名稱打錯這類「使用者輸入問題」，跟核算結果無關。"""
     pass
 
 
@@ -58,6 +73,7 @@ class SheetLayout:
         self.groups = {}  # group_name -> {subcol_name: col_idx}
         self.first_data_row = None
         self.last_data_row = None
+        self.scan_stop_reason = None  # 資料列掃描為什麼停在 last_data_row（一定要讓使用者看到）
         self._detect()
 
     def _find_group_header_row(self):
@@ -129,12 +145,14 @@ class SheetLayout:
         data_start = self.subheader_row + 1
         last_row = data_start
         empty_streak = 0
-        for r in range(data_start, min(ws.max_row, data_start + 400) + 1):
+        reason = '掃到工作表最後一列（第 {0} 列）'.format(ws.max_row)
+        for r in range(data_start, ws.max_row + 1):
             a = ws.cell(row=r, column=self.code_col).value
             b = ws.cell(row=r, column=self.name_col).value
             if a is None and b is None:
                 empty_streak += 1
                 if empty_streak >= 8:
+                    reason = '第 {0} 列起連續 8 列空白'.format(r - 7)
                     break
                 continue
             # ws 是公式模式的工作表，數量/複價欄合法值不是 None 就是公式字串（"=..."）；
@@ -145,15 +163,20 @@ class SheetLayout:
                 for c in numeric_cols
             )
             if has_stray_text:
+                reason = '第 {0} 列的數量/複價欄出現非公式文字（研判是表尾註記/簽名欄）'.format(r)
                 break
             empty_streak = 0
             last_row = r
             # 表格慣例上「總計」是資料區的最後一列，之後接的是簽名欄／日期註記，
-            # 遇到就停止往下掃，避免把表尾雜訊也當成資料列
-            if isinstance(b, str) and '總計' in b:
+            # 遇到就停止往下掃，避免把表尾雜訊也當成資料列。
+            # 但「本頁小計」「承前頁總計」這種分頁彙總列是資料區中途的列，不能當結尾。
+            if isinstance(b, str) and '總計' in b and not any(
+                    k in b for k in ('本頁', '次頁', '承前', '接次')):
+                reason = '第 {0} 列名稱含「總計」，視為資料區最後一列'.format(r)
                 break
         self.first_data_row = data_start
         self.last_data_row = last_row
+        self.scan_stop_reason = reason
 
     def col(self, group, subcol):
         g = self.groups.get(group)
@@ -169,12 +192,39 @@ class SheetLayout:
         for name, cols in self.groups.items():
             if cols:
                 lines.append('  【{0}】 {1}'.format(name, cols))
+        lines.append('  掃描停止原因：{0}'.format(self.scan_stop_reason))
+        lines.append('  ↑ 如果表格實際的資料列不只到第 {0} 列，代表掃描提早停了，'
+                     '結果不完整，要回報使用者。'.format(self.last_data_row))
         return '\n'.join(lines)
 
 
 def _num(v):
     """把讀到的值收斂成數字或 None，防止表尾雜訊文字混進算式。"""
     return v if isinstance(v, (int, float)) else None
+
+
+def _round_half_up(v):
+    """四捨五入到整數（Excel ROUND 的行為）。
+
+    不能用 Python 內建的 round()——它是「銀行家捨入」(round-half-to-even)：
+    round(1234.5) 會給 1234，但 Excel 的 ROUND(1234.5,0) 給 1235，
+    單價帶小數時就會憑空生出假異常。
+    """
+    return float(Decimal(repr(float(v))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+
+
+def _key(v):
+    """項次代碼／名稱拿來配對用的正規化鍵。
+
+    兩份檔案同一個項次，一份可能存成數字 1、另一份存成文字 "1"，
+    或是縮排空格、全形空格不一樣——不正規化就會誤判成「找不到對應項次」。
+    """
+    if v is None:
+        return None
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    s = re.sub(r'\s+', '', str(v))
+    return s or None
 
 
 def check_extended_price(wf, wv, layout, group='本期完成', tol=0.5):
@@ -196,7 +246,7 @@ def check_extended_price(wf, wv, layout, group='本期完成', tol=0.5):
         amt_formula = wf.cell(row=r, column=amt_col).value
         if price is None or qty is None:
             continue  # 小計/特殊列，非逐項乘積
-        expected = round(price * qty)
+        expected = _round_half_up(price * qty)
         ok = amt is not None and abs(expected - amt) < tol
         results.append(dict(row=r, code=code, name=name, price=price, qty=qty,
                              expected=expected, actual=amt, ok=ok, formula=amt_formula))
@@ -232,13 +282,39 @@ def check_within_period(wv, layout, tol=0.5):
         else:
             exp_q = (pq or 0) + (cq or 0)
             q_ok = tq is not None and abs(exp_q - tq) < 0.0001
-        exp_a = (pa or 0) + (ca or 0)
-        a_ok = ta is not None and abs(exp_a - ta) < tol
+        if pa is None and ca is None and ta is None:
+            # 同上：這一列三個複價欄都是空的（大項標題列、表尾註記列），
+            # 不是「累計欄漏填」，不當異常處理
+            exp_a, a_ok = None, True
+        else:
+            exp_a = (pa or 0) + (ca or 0)
+            a_ok = ta is not None and abs(exp_a - ta) < tol
         results.append(dict(row=r, code=code, name=name,
                              prev_qty=pq, prev_amt=pa, cur_qty=cq, cur_amt=ca,
                              tot_qty=tq, tot_amt=ta, exp_qty=exp_q, exp_amt=exp_a,
                              qty_ok=q_ok, amt_ok=a_ok))
     return results, None
+
+
+def _build_b_index(wv_b, layout_b):
+    """建 B 檔的配對索引：(依代碼, 依名稱, 重複鍵集合)。鍵都經過 `_key()` 正規化。
+
+    同一個鍵出現兩列以上時不能亂配——記進 dup，配對時直接判為「無法配對」，
+    不要靜靜地挑其中一列來比。
+    """
+    by_code, by_name, dup = {}, {}, set()
+    for r in range(layout_b.first_data_row, layout_b.last_data_row + 1):
+        code = _key(wv_b.cell(row=r, column=layout_b.code_col).value)
+        # 沒有項次代碼的列（常見於「總計」「物價調整金額」這類彙總列），改用名稱比對
+        name = _key(wv_b.cell(row=r, column=layout_b.name_col).value)
+        target, key = (by_code, code) if code else (by_name, name)
+        if key is None:
+            continue
+        if key in target:
+            dup.add(key)
+        else:
+            target[key] = r
+    return by_code, by_name, dup
 
 
 def check_cross_period(wv_a, layout_a, wv_b, layout_b, tol_qty=0.0001, tol_amt=0.5):
@@ -250,18 +326,10 @@ def check_cross_period(wv_a, layout_a, wv_b, layout_b, tol_qty=0.0001, tol_amt=0
     if a_a is None or b_a is None:
         return [], 'A檔缺累計至本期複價欄，或B檔缺前期累計複價欄，略過此檢查'
 
-    b_index_by_code = {}
-    b_index_by_name = {}
-    for r in range(layout_b.first_data_row, layout_b.last_data_row + 1):
-        code = wv_b.cell(row=r, column=layout_b.code_col).value
-        name = wv_b.cell(row=r, column=layout_b.name_col).value
-        if code:
-            b_index_by_code[code] = r
-        elif name:
-            # 沒有項次代碼的列（常見於「總計」「物價調整金額」這類彙總列），改用名稱比對
-            b_index_by_name[name] = r
+    b_index_by_code, b_index_by_name, b_dup = _build_b_index(wv_b, layout_b)
 
     results = []
+    used_b_rows = set()
     for r in range(layout_a.first_data_row, layout_a.last_data_row + 1):
         code = wv_a.cell(row=r, column=layout_a.code_col).value
         name = wv_a.cell(row=r, column=layout_a.name_col).value
@@ -269,19 +337,45 @@ def check_cross_period(wv_a, layout_a, wv_b, layout_b, tol_qty=0.0001, tol_amt=0
             continue
         aq = wv_a.cell(row=r, column=a_q).value if a_q else None
         aa = wv_a.cell(row=r, column=a_a).value
-        br = b_index_by_code.get(code) if code else b_index_by_name.get(name)
+        k_code, k_name = _key(code), _key(name)
+        key = k_code or k_name
+        if key in b_dup:
+            results.append(dict(a_row=r, b_row=None, code=code, name=name,
+                                 a_qty=aq, a_amt=aa, b_qty=None, b_amt=None,
+                                 qty_ok=False, amt_ok=False, matched=False,
+                                 note='本期有多列的項次/名稱都是「{0}」，無法確定要跟哪一列比'.format(key)))
+            continue
+        br = b_index_by_code.get(k_code) if k_code else b_index_by_name.get(k_name)
         if br is None:
             results.append(dict(a_row=r, b_row=None, code=code, name=name,
                                  a_qty=aq, a_amt=aa, b_qty=None, b_amt=None,
-                                 qty_ok=False, amt_ok=False, matched=False))
+                                 qty_ok=False, amt_ok=False, matched=False,
+                                 note='本期找不到對應項次/名稱'))
             continue
+        used_b_rows.add(br)
         bq = wv_b.cell(row=br, column=b_q).value if b_q else None
         ba = wv_b.cell(row=br, column=b_a).value
         qty_ok = (a_q is None or b_q is None) or (abs((aq or 0) - (bq or 0)) < tol_qty)
         amt_ok = abs((aa or 0) - (ba or 0)) < tol_amt
         results.append(dict(a_row=r, b_row=br, code=code, name=name,
                              a_qty=aq, a_amt=aa, b_qty=bq, b_amt=ba,
-                             qty_ok=qty_ok, amt_ok=amt_ok, matched=True))
+                             qty_ok=qty_ok, amt_ok=amt_ok, matched=True, note=''))
+
+    # 反向再掃一次：本期有、前一期沒有的列。本期新增的項目「前期累計」本來就該是 0；
+    # 若它的前期累計有金額，卻在前一期表上找不到這一項，就是銜接對不起來。
+    for r in range(layout_b.first_data_row, layout_b.last_data_row + 1):
+        if r in used_b_rows:
+            continue
+        ba = _num(wv_b.cell(row=r, column=b_a).value)
+        if not ba:
+            continue
+        results.append(dict(a_row=None, b_row=r,
+                             code=wv_b.cell(row=r, column=layout_b.code_col).value,
+                             name=wv_b.cell(row=r, column=layout_b.name_col).value,
+                             a_qty=None, a_amt=None,
+                             b_qty=wv_b.cell(row=r, column=b_q).value if b_q else None,
+                             b_amt=ba, qty_ok=False, amt_ok=False, matched=False,
+                             note='前一期找不到這一項，但本期的前期累計有金額'))
     return results, None
 
 
@@ -291,7 +385,8 @@ def check_subitem_sum(wf, wv, layout, group='本期完成'):
     if amt_col is None:
         return [], '缺少該群組複價欄，略過此檢查'
     results = []
-    pattern = re.compile(r'^=SUM\([A-Z]+(\d+):[A-Z]+(\d+)\)$')
+    # 允許 $ 絕對位址（=SUM($J$7:$J$8)）與小寫 sum；範圍必須落在同一欄
+    pattern = re.compile(r'^=SUM\(\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)\)$', re.IGNORECASE)
     for r in range(layout.first_data_row, layout.last_data_row + 1):
         f = wf.cell(row=r, column=amt_col).value
         if not isinstance(f, str):
@@ -299,10 +394,14 @@ def check_subitem_sum(wf, wv, layout, group='本期完成'):
         m = pattern.match(f.replace(' ', ''))
         if not m:
             continue
-        a, b = int(m.group(1)), int(m.group(2))
+        col_from, col_to = m.group(1).upper(), m.group(3).upper()
+        if col_from != col_to:
+            continue  # 跨欄範圍（=SUM(A1:B5)）不是小計列的加總，不處理
+        child_col = column_index_from_string(col_from)
+        a, b = int(m.group(2)), int(m.group(4))
         child_sum = 0
         for cr in range(a, b + 1):
-            child_sum += wv.cell(row=cr, column=amt_col).value or 0
+            child_sum += _num(wv.cell(row=cr, column=child_col).value) or 0
         actual = wv.cell(row=r, column=amt_col).value or 0
         code = wv.cell(row=r, column=layout.code_col).value
         name = wv.cell(row=r, column=layout.name_col).value
@@ -318,22 +417,17 @@ def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b):
     b_q, b_a = layout_b.col('前期累計', '數量'), layout_b.col('前期累計', '複價')
     if a_a is None or b_a is None:
         return [], '缺少必要欄位，略過此檢查'
-    b_index_by_code = {}
-    b_index_by_name = {}
-    for r in range(layout_b.first_data_row, layout_b.last_data_row + 1):
-        code = wv_b.cell(row=r, column=layout_b.code_col).value
-        name = wv_b.cell(row=r, column=layout_b.name_col).value
-        if code:
-            b_index_by_code[code] = r
-        elif name:
-            b_index_by_name[name] = r
+    b_index_by_code, b_index_by_name, b_dup = _build_b_index(wv_b, layout_b)
     results = []
     for r in range(layout_a.first_data_row, layout_a.last_data_row + 1):
         code = wv_a.cell(row=r, column=layout_a.code_col).value
         name = wv_a.cell(row=r, column=layout_a.name_col).value
         if code is None and name is None:
             continue
-        br = b_index_by_code.get(code) if code else b_index_by_name.get(name)
+        k_code, k_name = _key(code), _key(name)
+        if (k_code or k_name) in b_dup:
+            continue  # 配不出唯一對象，交給 cross_period 去報「無法配對」
+        br = b_index_by_code.get(k_code) if k_code else b_index_by_name.get(k_name)
         if br is None:
             continue
         qd1 = qd2 = None
@@ -349,9 +443,20 @@ def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b):
     return results, None
 
 
+def _load(path, sheet_name):
+    """讀出 (公式版工作表, 值版工作表)。檔案/分頁有問題就丟 InputError，不要讓它變 traceback。"""
+    if not Path(path).exists():
+        raise InputError('找不到檔案：{0}'.format(path))
+    wb_f = openpyxl.load_workbook(path, data_only=False)
+    if sheet_name not in wb_f.sheetnames:
+        raise InputError('檔案「{0}」裡沒有分頁「{1}」。這個檔案的分頁有：{2}'.format(
+            Path(path).name, sheet_name, '、'.join(wb_f.sheetnames)))
+    wb_v = openpyxl.load_workbook(path, data_only=True)
+    return wb_f[sheet_name], wb_v[sheet_name]
+
+
 def run_all(path_a, sheet_name, path_b=None, price_group='本期完成'):
-    wf_a = openpyxl.load_workbook(path_a, data_only=False)[sheet_name]
-    wv_a = openpyxl.load_workbook(path_a, data_only=True)[sheet_name]
+    wf_a, wv_a = _load(path_a, sheet_name)
     layout_a = SheetLayout(wf_a)
 
     out = dict(file_a=str(path_a), sheet=sheet_name, layout_a=layout_a.describe())
@@ -360,8 +465,7 @@ def run_all(path_a, sheet_name, path_b=None, price_group='本期完成'):
     out['subitem_sum'], out['subitem_sum_skip'] = check_subitem_sum(wf_a, wv_a, layout_a, price_group)
 
     if path_b:
-        wf_b = openpyxl.load_workbook(path_b, data_only=False)[sheet_name]
-        wv_b = openpyxl.load_workbook(path_b, data_only=True)[sheet_name]
+        wf_b, wv_b = _load(path_b, sheet_name)
         layout_b = SheetLayout(wf_b)
         out['file_b'] = str(path_b)
         out['layout_b'] = layout_b.describe()
@@ -372,27 +476,54 @@ def run_all(path_a, sheet_name, path_b=None, price_group='本期完成'):
 
 
 def print_summary(out):
-    def line(title, results, skip):
-        if skip:
-            print('- {0}：{1}'.format(title, skip))
-            return
-        n = len(results)
-        bad = [x for x in results if not x.get('ok', x.get('matched', True) and
-               x.get('qty_ok', True) and x.get('amt_ok', True) and x.get('qty_match', True)
-               and x.get('amt_match', True))]
-        print('- {0}：共 {1} 項，異常 {2} 項'.format(title, n, len(bad)))
-        for x in bad[:20]:
-            print('    row/code={0} {1} -> {2}'.format(x.get('row', x.get('a_row')), x.get('code'), x))
-
+    print('【前一期／本檔】')
     print(out['layout_a'])
+    if 'layout_b' in out:
+        print()
+        print('【本期】')
+        print(out['layout_b'])
     print()
     print('=== 核算結果 ===')
-    line('單價x數量=複價', out['extended_price'], out['extended_price_skip'])
-    line('前期+本期=累計', out['within_period'], out['within_period_skip'])
-    line('子項加總反查', out['subitem_sum'], out['subitem_sum_skip'])
-    if 'cross_period' in out:
-        line('跨期銜接比對', out['cross_period'], out['cross_period_skip'])
-        line('畫面顯示文字比對', out['display_text'], out['display_text_skip'])
+    for key in CHECK_KEYS:
+        if key not in out:
+            continue
+        title = CHECK_TITLES[key][0]
+        skip = out.get(key + '_skip')
+        if skip:
+            print('- {0}：⚠ 略過未檢查 — {1}'.format(title, skip))
+            continue
+        bad = [x for x in out[key] if not _row_ok(key, x)]
+        print('- {0}：共 {1} 項，異常 {2} 項'.format(title, len(out[key]), len(bad)))
+        for x in bad[:20]:
+            print('    row/code={0} {1} -> {2}'.format(x.get('row', x.get('a_row')), x.get('code'), x))
+        if len(bad) > 20:
+            print('    …另有 {0} 筆異常沒列出來，跑 --md 看完整報告'.format(len(bad) - 20))
+    print()
+    print(conclusion_line(out))
+
+
+def summarize(out):
+    """回傳 (異常筆數, 被略過的檢查標題清單)。exit code 跟結論都由這裡決定。"""
+    bad = 0
+    skipped = []
+    for key in CHECK_KEYS:
+        if key not in out:
+            continue
+        if out.get(key + '_skip'):
+            skipped.append(CHECK_TITLES[key][0])
+            continue
+        bad += sum(1 for x in out[key] if not _row_ok(key, x))
+    return bad, skipped
+
+
+def conclusion_line(out):
+    bad, skipped = summarize(out)
+    text = ('結論：共發現 {0} 筆異常。'.format(bad) if bad
+            else '結論：已跑的檢查全數相符，未發現異常。')
+    if skipped:
+        text += '\n⚠ 但有 {0} 項檢查因為欄位不齊沒跑到（{1}），不能回報「全部相符」。'.format(
+            len(skipped), '、'.join(skipped))
+    return text
 
 
 def _row_ok(key, x):
@@ -408,6 +539,8 @@ def _row_ok(key, x):
         return x['qty_match'] and x['amt_match']
     return True
 
+
+CHECK_KEYS = ('extended_price', 'within_period', 'subitem_sum', 'cross_period', 'display_text')
 
 CHECK_TITLES = {
     'extended_price': ('單價 x 本期數量 = 複價', '逐項核對每一列的單價乘上本期數量，是否等於複價欄位的實際值'),
@@ -437,11 +570,13 @@ def build_markdown(result):
     lines.append('')
     lines.append('```')
     lines.append(result['layout_a'])
+    if 'layout_b' in result:
+        lines.append('')
+        lines.append(result['layout_b'])
     lines.append('```')
     lines.append('')
 
-    overall_bad = 0
-    for key in ('extended_price', 'within_period', 'subitem_sum', 'cross_period', 'display_text'):
+    for key in CHECK_KEYS:
         if key not in result:
             continue
         title, desc = CHECK_TITLES[key]
@@ -456,7 +591,6 @@ def build_markdown(result):
             lines.append('')
             continue
         bad = [x for x in rows if not _row_ok(key, x)]
-        overall_bad += len(bad)
         lines.append('共 {0} 項，異常 {1} 項{2}'.format(
             len(rows), len(bad), '（全數正確 ✓）' if not bad else ''))
         lines.append('')
@@ -491,7 +625,7 @@ def build_markdown(result):
                 lines.append('|---|---|---:|---:|---:|---:|---|')
                 for x in bad:
                     if not x['matched']:
-                        problem = '本期找不到對應項次/名稱'
+                        problem = x.get('note') or '本期找不到對應項次/名稱'
                     else:
                         problem = '、'.join(
                             (['數量'] if not x['qty_ok'] else []) + (['複價'] if not x['amt_ok'] else []))
@@ -508,8 +642,7 @@ def build_markdown(result):
         lines.append('')
 
     lines.append('---')
-    lines.append('**結論：{0}**'.format('全數核對正確，未發現異常。' if overall_bad == 0 else
-                                     '共發現 {0} 筆異常，詳見上方各節。'.format(overall_bad)))
+    lines.append('**{0}**'.format(conclusion_line(result).replace('\n', '**\n\n**')))
     return '\n'.join(lines)
 
 
@@ -520,20 +653,22 @@ if __name__ == '__main__':
     ap.add_argument('--sheet', required=True, help='要核算的分頁名稱，例如「請款明細表」')
     ap.add_argument('--price-group', default='本期完成', help='複價核算要用哪個群組（預設：本期完成）')
     ap.add_argument('--md', action='store_true', help='額外輸出 <period_a檔名>-核算報告.md（跟 period_a 同目錄）')
+    ap.add_argument('--version', action='version', version=__version__)
     args = ap.parse_args()
 
-    result = run_all(args.period_a, args.sheet, args.period_b, args.price_group)
-    print_summary(result)
+    try:
+        result = run_all(args.period_a, args.sheet, args.period_b, args.price_group)
+    except (InputError, LayoutError) as e:
+        # 檔案/分頁/版型的問題不是「核算發現異常」，exit code 要分得開
+        print('無法核算：{0}'.format(e))
+        sys.exit(3)
 
-    any_bad = False
-    for key in ('extended_price', 'within_period', 'subitem_sum', 'cross_period', 'display_text'):
-        for x in result.get(key, []):
-            if not _row_ok(key, x):
-                any_bad = True
+    print_summary(result)
 
     if args.md:
         md_path = Path(args.period_a).with_name(Path(args.period_a).stem + '-核算報告.md')
         md_path.write_text(build_markdown(result), encoding='utf-8')
         print('\n已輸出：{0}'.format(md_path))
 
-    sys.exit(1 if any_bad else 0)
+    bad, skipped = summarize(result)
+    sys.exit(1 if bad else (2 if skipped else 0))

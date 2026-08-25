@@ -13,7 +13,8 @@ import openpyxl
 
 sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 from verify_payment import (SheetLayout, check_extended_price, check_within_period,  # noqa: E402
-                             check_subitem_sum, check_cross_period, check_display_text_cross)
+                             check_subitem_sum, check_cross_period, check_display_text_cross,
+                             summarize)
 
 FAILURES = []
 
@@ -105,6 +106,18 @@ check('extended_price 偵測到2項', len(results) == 2)
 check('extended_price 正確項目判定為 ok', results[0]['ok'] is True)
 check('extended_price 錯誤項目判定為不 ok', results[1]['ok'] is False)
 
+# 四捨五入要跟 Excel 的 ROUND 一致（不是 Python round() 的銀行家捨入）：
+# 0.5 x 2469 = 1234.5，Excel 給 1235；用 round() 會給 1234 而誤判成異常
+rows = [
+    dict(code='壹.一', name='剛好.5進位', price=0.5, cq=2469, ca=1235),
+    dict(code='壹.二', name='剛好.5進位2', price=0.5, cq=2467, ca=1234),
+]
+wf, wv = save_and_reload(build_workbook(rows))
+results, skip = check_extended_price(wf, wv, SheetLayout(wf), group='本期完成')
+check('extended_price .5 依 Excel 規則進位，不誤判',
+      results[0]['ok'] is True and results[1]['ok'] is True,
+      str([(x['expected'], x['actual']) for x in results]))
+
 # ------------------------------------------------------------------
 # within_period：前期 + 本期 = 累計
 # ------------------------------------------------------------------
@@ -119,7 +132,18 @@ results, skip = check_within_period(wv, layout)
 check('within_period 偵測到3項', len(results) == 3)
 check('within_period 正確項目 ok', results[0]['amt_ok'] is True)
 check('within_period 錯誤項目不 ok', results[1]['amt_ok'] is False)
-check('within_period 全空列不誤判為異常', results[2]['qty_ok'] is True)
+check('within_period 全空列不誤判為異常（數量）', results[2]['qty_ok'] is True)
+check('within_period 全空列不誤判為異常（複價）', results[2]['amt_ok'] is True, str(results[2]))
+
+# 大項標題列：有名稱、三個複價欄都空的，不該被判成「累計欄漏填」
+rows = [
+    dict(code='壹', name='大項標題列（無金額）'),
+    dict(code='壹.一', name='正常', pa=100, ca=50, ta=150),
+]
+wf, wv = save_and_reload(build_workbook(rows))
+results, skip = check_within_period(wv, SheetLayout(wf))
+check('within_period 大項標題列不誤判為異常',
+      results[0]['qty_ok'] is True and results[0]['amt_ok'] is True, str(results[0]))
 
 # ------------------------------------------------------------------
 # subitem_sum：小計列 SUM 公式 vs 子項加總
@@ -173,6 +197,22 @@ if len(results) == 2:
     check('subitem_sum 正確小計判定為 ok', results[0]['ok'] is True, str(results[0]))
     check('subitem_sum 錯誤小計判定為不 ok', results[1]['ok'] is False, str(results[1]))
 
+# 絕對位址 $ 與小寫 sum 也要認得（Excel 另存或手工改公式很常出現）
+fake_abs_wf = {
+    (6, 1): '壹', (6, 2): '小計($絕對位址)', (6, 10): '=SUM($J$7:$J$8)',
+    (7, 10): 300, (8, 10): 200,
+    (9, 1): '貳', (9, 2): '小計(小寫sum)', (9, 10): '=sum(J10:J11)',
+    (10, 10): 100, (11, 10): 100,
+}
+fake_abs_wv = dict(fake_abs_wf)
+fake_abs_wv[(6, 10)] = 500
+fake_abs_wv[(9, 10)] = 200
+results = check_subitem_sum(_FakeSheet(fake_abs_wf), _FakeSheet(fake_abs_wv), fake_layout,
+                            group='本期完成')[0]
+check('subitem_sum 認得 $ 絕對位址與小寫 sum', len(results) == 2, str(results))
+check('subitem_sum $ 絕對位址的小計判定正確',
+      all(x['ok'] for x in results), str(results))
+
 # ------------------------------------------------------------------
 # cross_period：A檔累計至本期 vs B檔前期累計（含無代碼、用名稱配對的總計列）
 # ------------------------------------------------------------------
@@ -199,6 +239,37 @@ check('cross_period 無代碼列用名稱配對成功', len(none_rows) == 1 and 
 if none_rows:
     check('cross_period 無代碼列(總計)判定為相符', none_rows[0]['amt_ok'] is True)
 
+# 項次代碼型別不同（一份存成數字 1、另一份存成文字 "1"）仍要配得起來
+wf_a, wv_a = save_and_reload(build_workbook([dict(code=1, name='項目一', ta=100)]))
+wf_b, wv_b = save_and_reload(build_workbook([dict(code='1', name='項目一', pa=100)]))
+results = check_cross_period(wv_a, SheetLayout(wf_a), wv_b, SheetLayout(wf_b))[0]
+check('cross_period 代碼型別不同仍配對成功',
+      results[0]['matched'] is True and results[0]['amt_ok'] is True, str(results[0]))
+
+# 本期有、前一期沒有的列：前期累計有金額 -> 異常；前期累計是 0（本期新增）-> 不算異常
+wf_a, wv_a = save_and_reload(build_workbook([dict(code='壹.一', name='舊項目', ta=100)]))
+wf_b, wv_b = save_and_reload(build_workbook([
+    dict(code='壹.一', name='舊項目', pa=100),
+    dict(code='壹.二', name='本期新增(前期累計0)', pa=0),
+    dict(code='壹.三', name='前一期沒有卻有前期累計', pa=500),
+]))
+results = check_cross_period(wv_a, SheetLayout(wf_a), wv_b, SheetLayout(wf_b))[0]
+reverse = [x for x in results if x['a_row'] is None]
+check('cross_period 反向掃到「前一期沒有、本期前期累計卻有金額」的列',
+      len(reverse) == 1 and reverse[0]['code'] == '壹.三', str(reverse))
+check('cross_period 本期新增(前期累計0)不誤報', all(x['code'] != '壹.二' for x in reverse))
+
+# 本期有兩列同樣的項次 -> 不能亂配，要判為無法配對
+wf_a, wv_a = save_and_reload(build_workbook([dict(code='壹.一', name='項目', ta=100)]))
+wf_b, wv_b = save_and_reload(build_workbook([
+    dict(code='壹.一', name='項目', pa=100),
+    dict(code='壹.一', name='項目(重複代碼)', pa=999),
+]))
+results = check_cross_period(wv_a, SheetLayout(wf_a), wv_b, SheetLayout(wf_b))[0]
+dup_row = [x for x in results if x['a_row'] is not None][0]
+check('cross_period 本期重複代碼判為無法配對',
+      dup_row['matched'] is False and '無法確定' in dup_row['note'], str(dup_row))
+
 # ------------------------------------------------------------------
 # display_text：底層數值相同，但顯示格式不同 -> 應判定為不一致
 # ------------------------------------------------------------------
@@ -218,6 +289,43 @@ if results:
           results[0]['amt_match'] is False, str(results[0]))
     check('display_text 顯示文字確實不同（非誤判）',
           results[0]['amt_disp_a'] != results[0]['amt_disp_b'])
+
+# ------------------------------------------------------------------
+# SheetLayout 資料列掃描：可以停，但不可以「靜靜地」停
+# ------------------------------------------------------------------
+rows = [dict(code='壹.%d' % i, name='項目%d' % i, pa=1, ca=1, ta=2) for i in range(1, 451)]
+wf, wv = save_and_reload(build_workbook(rows))
+layout = SheetLayout(wf)
+scanned = len(check_within_period(wv, layout)[0])
+check('掃描沒有 400 列上限（450 列要全掃到）', scanned == 450, '實際只掃到 {0} 列'.format(scanned))
+check('掃描停止原因有記錄', bool(layout.scan_stop_reason), str(layout.scan_stop_reason))
+check('describe() 會印出掃描停止原因', '掃描停止原因' in layout.describe())
+
+# 「本頁總計」是中途的分頁彙總列，不能當成資料區結尾
+rows = [dict(code='壹.一', name='前段', pa=1, ca=1, ta=2),
+        dict(code=None, name='本頁總計', pa=1, ca=1, ta=2),
+        dict(code='貳.一', name='後段', pa=1, ca=1, ta=2)]
+wf, wv = save_and_reload(build_workbook(rows))
+scanned = len(check_within_period(wv, SheetLayout(wf))[0])
+check('「本頁總計」不截斷資料區', scanned == 3, '只掃到 {0} 列'.format(scanned))
+
+# 「總計」仍然視為資料區的最後一列
+rows = [dict(code='壹.一', name='前段', pa=1, ca=1, ta=2),
+        dict(code=None, name='總計', pa=1, ca=1, ta=2),
+        dict(code=None, name='施工承攬廠商（編製）：')]
+wf, wv = save_and_reload(build_workbook(rows))
+scanned = len(check_within_period(wv, SheetLayout(wf))[0])
+check('「總計」仍視為資料區最後一列', scanned == 2, '掃到 {0} 列'.format(scanned))
+
+# ------------------------------------------------------------------
+# 結論/exit code：有檢查被略過時，不能算成「全部相符」
+# ------------------------------------------------------------------
+bad, skipped = summarize({
+    'extended_price': [], 'extended_price_skip': '缺少必要欄位（單價/數量/複價），略過此檢查',
+    'within_period': [dict(qty_ok=True, amt_ok=True)], 'within_period_skip': None,
+})
+check('summarize 會回報被略過的檢查（exit code 才會是 2）',
+      bad == 0 and len(skipped) == 1, str((bad, skipped)))
 
 # ------------------------------------------------------------------
 print()

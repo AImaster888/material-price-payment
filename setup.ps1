@@ -15,7 +15,7 @@ Write-Host "Repo 路徑：$root" -ForegroundColor Cyan
 
 # 1. 安裝 Python 依賴
 Write-Host ""
-Write-Host "[1/2] 安裝 Python 依賴..." -ForegroundColor Yellow
+Write-Host "[1/3] 安裝 Python 依賴..." -ForegroundColor Yellow
 pip install -r requirements.txt -q
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  x 失敗，請手動執行：pip install -r requirements.txt" -ForegroundColor Red
@@ -25,8 +25,10 @@ Write-Host "  v openpyxl 已安裝" -ForegroundColor Green
 
 # 2. 跑測試，確保這份 clone 本身沒問題
 Write-Host ""
-Write-Host "[1.5/2] 跑內建測試..." -ForegroundColor Yellow
-python tests\run_tests.py
+Write-Host "[2/3] 跑內建測試..." -ForegroundColor Yellow
+# 測試輸出是繁中，cp950 主控台會 UnicodeEncodeError 被誤判成「測試沒過」
+$env:PYTHONIOENCODING = "utf-8"
+python -X utf8 tests\run_tests.py
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  x 測試沒過，先別裝 skill，回報這個訊息給維護者" -ForegroundColor Red
     exit 1
@@ -35,7 +37,7 @@ Write-Host "  v 測試全綠" -ForegroundColor Green
 
 # 3. 安裝 Claude Code skill
 Write-Host ""
-Write-Host "[2/2] 安裝 Claude Code skill ..." -ForegroundColor Yellow
+Write-Host "[3/3] 安裝 Claude Code skill ..." -ForegroundColor Yellow
 $skillDir = Join-Path $env:USERPROFILE ".claude\skills\material-price-payment"
 New-Item -ItemType Directory -Force -Path $skillDir | Out-Null
 
