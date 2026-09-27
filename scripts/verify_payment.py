@@ -45,7 +45,7 @@ from openpyxl.utils import column_index_from_string
 sys.path.insert(0, str(Path(__file__).parent))
 from render_excel import render_display  # noqa: E402
 
-__version__ = '1.2.0'  # 2026-09-27
+__version__ = '1.3.0'  # 2026-09-27
 
 GROUP_NAMES = ['原契約', '原派工', '第一次變更設計', '第一次變更設計(議價前)', '前期累計', '本期完成', '累計至本期']
 GROUP_SYNONYMS = {'原派工': '原契約'}  # 不同期的檔案可能對同一個群組用不同標題文字
@@ -415,6 +415,12 @@ DISPLAY_CAUSE_FORMAT = '格式不同（數字相同）'
 DISPLAY_CAUSE_VALUE = '數字不同'
 
 
+def _same_display(d1, d2):
+    """「-」（0 用會計格式顯示）跟空白格，紙本上都是「沒有數字」，不算畫面不一致。"""
+    empty = ('', '-')
+    return d1 == d2 or (d1 in empty and d2 in empty)
+
+
 def _same_value(v1, v2, tol):
     return abs((_num(v1) or 0) - (_num(v2) or 0)) < tol
 
@@ -453,8 +459,8 @@ def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b, tol_qty
         av1, av2 = wv_a.cell(row=r, column=a_a).value, wv_b.cell(row=br, column=b_a).value
         ad1 = render_display(av1, wf_a.cell(row=r, column=a_a).number_format)
         ad2 = render_display(av2, wf_b.cell(row=br, column=b_a).number_format)
-        q_match = (qd1 is None) or (qd1 == qd2)
-        a_match = (ad1 == ad2)
+        q_match = (qd1 is None) or _same_display(qd1, qd2)
+        a_match = _same_display(ad1, ad2)
         cause = ''
         if not (q_match and a_match):
             value_differs = (not q_match and not q_same) or (not a_match and not _same_value(av1, av2, tol_amt))
@@ -491,6 +497,10 @@ def run_all(path_a, sheet_name, path_b=None, price_group='本期完成'):
         layout_b = SheetLayout(wf_b)
         out['file_b'] = str(path_b)
         out['layout_b'] = layout_b.describe()
+        # 本期自己也要核單檔三項——審查的重點本來就是本期，只核前一期等於漏掉本期的錯
+        out['extended_price_b'], out['extended_price_b_skip'] = check_extended_price(wf_b, wv_b, layout_b, price_group)
+        out['within_period_b'], out['within_period_b_skip'] = check_within_period(wv_b, layout_b)
+        out['subitem_sum_b'], out['subitem_sum_b_skip'] = check_subitem_sum(wf_b, wv_b, layout_b, price_group)
         out['cross_period'], out['cross_period_skip'] = check_cross_period(wv_a, layout_a, wv_b, layout_b)
         out['display_text'], out['display_text_skip'] = check_display_text_cross(
             wv_a, wf_a, layout_a, wv_b, wf_b, layout_b)
@@ -509,7 +519,7 @@ def print_summary(out):
     for key in CHECK_KEYS:
         if key not in out:
             continue
-        title = CHECK_TITLES[key][0]
+        title = check_title(key, out)
         skip = out.get(key + '_skip')
         if skip:
             print('- {0}：⚠ 略過未檢查 — {1}'.format(title, skip))
@@ -540,7 +550,7 @@ def summarize(out):
         if key not in out:
             continue
         if out.get(key + '_skip'):
-            skipped.append(CHECK_TITLES[key][0])
+            skipped.append(check_title(key, out))
             continue
         bad += sum(1 for x in out[key] if not _row_ok(key, x))
     return bad, skipped
@@ -556,7 +566,23 @@ def conclusion_line(out):
     return text
 
 
+def _base(key):
+    """'within_period_b'（本期那份的單檔檢查）跟 'within_period' 用同一套判定與表格。"""
+    return key[:-2] if key.endswith('_b') else key
+
+
+def check_title(key, out):
+    """兩期模式下單檔檢查會跑兩次，標題要分得出是哪一期；單檔模式不加期別。"""
+    title = CHECK_TITLES[_base(key)][0]
+    if key.endswith('_b'):
+        return title + '（本期）'
+    if 'file_b' in out and key in SINGLE_FILE_KEYS:
+        return title + '（前一期）'
+    return title
+
+
 def _row_ok(key, x):
+    key = _base(key)
     if key == 'extended_price':
         return x['ok']
     if key == 'within_period':
@@ -570,7 +596,8 @@ def _row_ok(key, x):
     return True
 
 
-CHECK_KEYS = ('extended_price', 'within_period', 'subitem_sum', 'cross_period', 'display_text')
+SINGLE_FILE_KEYS = ('extended_price', 'within_period', 'subitem_sum')
+CHECK_KEYS = SINGLE_FILE_KEYS + tuple(k + '_b' for k in SINGLE_FILE_KEYS) + ('cross_period', 'display_text')
 
 CHECK_TITLES = {
     'extended_price': ('單價 x 本期數量 = 複價', '逐項核對每一列的單價乘上本期數量，是否等於複價欄位的實際值'),
@@ -609,7 +636,7 @@ def build_markdown(result):
     for key in CHECK_KEYS:
         if key not in result:
             continue
-        title, desc = CHECK_TITLES[key]
+        title, desc = check_title(key, result), CHECK_TITLES[_base(key)][1]
         skip = result.get(key + '_skip')
         rows = result[key]
         lines.append('## {0}'.format(title))
@@ -625,14 +652,15 @@ def build_markdown(result):
             len(rows), len(bad), '（全數正確 ✓）' if not bad else _cause_breakdown(key, bad)))
         lines.append('')
         if bad:
-            if key == 'extended_price':
+            base = _base(key)
+            if base == 'extended_price':
                 lines.append('| 項次 | 工程項目 | 單價 | 數量 | 應為複價 | 實際複價 |')
                 lines.append('|---|---|---:|---:|---:|---:|')
                 for x in bad:
                     lines.append('| {0} | {1} | {2} | {3} | {4} | {5} |'.format(
                         (x['code'] or '—'), x['name'], _fmt_num(x['price']), _fmt_num(x['qty']),
                         _fmt_num(x['expected']), _fmt_num(x['actual'])))
-            elif key == 'within_period':
+            elif base == 'within_period':
                 lines.append('| 項次 | 工程項目 | 前期複價 | 本期複價 | 應為累計 | 實際累計 | 問題 |')
                 lines.append('|---|---|---:|---:|---:|---:|---|')
                 for x in bad:
@@ -644,13 +672,13 @@ def build_markdown(result):
                     lines.append('| {0} | {1} | {2} | {3} | {4} | {5} | {6} |'.format(
                         (x['code'] or '—'), x['name'], _fmt_num(x['prev_amt']), _fmt_num(x['cur_amt']),
                         _fmt_num(x['exp_amt']), _fmt_num(x['tot_amt']), '、'.join(problem)))
-            elif key == 'subitem_sum':
+            elif base == 'subitem_sum':
                 lines.append('| 小計列 | 工程項目 | 子項範圍 | 子項加總 | 小計實際值 |')
                 lines.append('|---|---|---|---:|---:|')
                 for x in bad:
                     lines.append('| {0} | {1} | {2} | {3} | {4} |'.format(
                         (x['code'] or '—'), x['name'], x['range'], _fmt_num(x['child_sum']), _fmt_num(x['actual'])))
-            elif key == 'cross_period':
+            elif base == 'cross_period':
                 lines.append('| 項次 | 工程項目 | 前一期累計數量 | 本期前期數量 | 前一期累計複價 | 本期前期複價 | 問題 |')
                 lines.append('|---|---|---:|---:|---:|---:|---|')
                 for x in bad:
@@ -662,7 +690,7 @@ def build_markdown(result):
                     lines.append('| {0} | {1} | {2} | {3} | {4} | {5} | {6} |'.format(
                         (x['code'] or '—'), x['name'], _fmt_num(x['a_qty']), _fmt_num(x['b_qty']),
                         _fmt_num(x['a_amt']), _fmt_num(x['b_amt']), problem))
-            elif key == 'display_text':
+            elif base == 'display_text':
                 lines.append('| 項次 | 工程項目 | 前一期顯示(數量) | 本期顯示(數量) | 前一期顯示(複價) | 本期顯示(複價) | 原因 |')
                 lines.append('|---|---|---|---|---|---|---|')
                 for x in bad:

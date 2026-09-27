@@ -14,7 +14,9 @@ import openpyxl
 sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 from verify_payment import (SheetLayout, check_extended_price, check_within_period,  # noqa: E402
                              check_subitem_sum, check_cross_period, check_display_text_cross,
-                             summarize, md_report_path, DISPLAY_CAUSE_FORMAT, DISPLAY_CAUSE_VALUE)
+                             summarize, md_report_path, DISPLAY_CAUSE_FORMAT, DISPLAY_CAUSE_VALUE,
+                             run_all, build_markdown, check_title)
+from render_excel import render_display  # noqa: E402
 
 FAILURES = []
 
@@ -309,6 +311,28 @@ wf_b, wv_b = save_and_reload(build_workbook(rows_same_b))
 results = check_display_text_cross(wv_a, wf_a, SheetLayout(wf_a), wv_b, wf_b, SheetLayout(wf_b))[0]
 check('display_text 顯示一致的列 cause 為空', results and results[0]['cause'] == '', str(results))
 
+# 空白格在 Excel 畫面上什麼都不顯示，不管格式設幾位小數——不能當成 0 渲染
+check('render_display 空白格顯示為空字串', render_display(None, '0.00') == '', repr(render_display(None, '0.00')))
+check('render_display 真正的 0 仍照格式顯示', render_display(0, '0.00') == '0.00', repr(render_display(0, '0.00')))
+wb_a = build_workbook([dict(code='壹', name='大項(數量格空白)', ta=100)])
+wb_a['明細表']['K6'].number_format = '0.00'
+wf_a, wv_a = save_and_reload(wb_a)
+wb_b = build_workbook([dict(code='壹', name='大項(數量格空白)', pa=100)])
+wb_b['明細表']['G6'].number_format = '0.000000'
+wf_b, wv_b = save_and_reload(wb_b)
+results = check_display_text_cross(wv_a, wf_a, SheetLayout(wf_a), wv_b, wf_b, SheetLayout(wf_b))[0]
+check('display_text 兩期數量格都空白、格式不同 -> 不算異常（畫面都是空的）',
+      results and results[0]['qty_match'] is True, str(results))
+
+# 一邊是 0 用會計格式顯示成「-」、另一邊是空白格：紙本上都是「沒有數字」，不算不一致
+wb_a = build_workbook([dict(code='壹', name='零值對空白', tq=0, ta=100)])
+wb_a['明細表']['K6'].number_format = '#,##0;-#,##0;"-"'
+wf_a, wv_a = save_and_reload(wb_a)
+wf_b, wv_b = save_and_reload(build_workbook([dict(code='壹', name='零值對空白', pa=100)]))
+results = check_display_text_cross(wv_a, wf_a, SheetLayout(wf_a), wv_b, wf_b, SheetLayout(wf_b))[0]
+check('display_text「-」對空白 -> 不算異常',
+      results and results[0]['qty_disp_a'] == '-' and results[0]['qty_match'] is True, str(results))
+
 # ------------------------------------------------------------------
 # --md 報告檔名要帶分頁名稱：同一組檔案先核請款明細表、再核計價總表，不可互相覆蓋
 # ------------------------------------------------------------------
@@ -344,6 +368,37 @@ rows = [dict(code='壹.一', name='前段', pa=1, ca=1, ta=2),
 wf, wv = save_and_reload(build_workbook(rows))
 scanned = len(check_within_period(wv, SheetLayout(wf))[0])
 check('「總計」仍視為資料區最後一列', scanned == 2, '掃到 {0} 列'.format(scanned))
+
+# ------------------------------------------------------------------
+# 兩期一起核：單檔三項（乘法、同檔累計、小計）前一期和本期都要跑，本期的錯也要抓得到
+# ------------------------------------------------------------------
+def save_to_path(wb):
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+    tmp.close()
+    wb.save(tmp.name)
+    return tmp.name
+
+
+path_a = save_to_path(build_workbook([dict(code='壹.一', name='項目', pa=0, ca=100, ta=100)]))
+path_b = save_to_path(build_workbook([dict(code='壹.一', name='項目', pa=100, ca=50, ta=999)]))  # 本期累計寫錯
+out = run_all(path_a, '明細表', path_b)
+check('兩期模式：前一期的同檔累計有跑', 'within_period' in out and len(out['within_period']) == 1, str(out.keys()))
+check('兩期模式：本期的同檔累計也有跑', 'within_period_b' in out and len(out['within_period_b']) == 1,
+      str(out.keys()))
+check('兩期模式：本期累計寫錯抓得到', out['within_period_b'] and out['within_period_b'][0]['amt_ok'] is False,
+      str(out.get('within_period_b')))
+check('兩期模式：本期的乘法、小計也有跑', 'extended_price_b' in out and 'subitem_sum_b' in out, str(out.keys()))
+check('兩期模式：本期的錯算進異常總數', summarize(out)[0] >= 1, str(summarize(out)))
+check('兩期模式：標題分得出前一期與本期',
+      '前一期' in check_title('within_period', out) and '本期' in check_title('within_period_b', out),
+      check_title('within_period', out) + ' / ' + check_title('within_period_b', out))
+check('兩期模式：md 報告有本期段落', '（本期）' in build_markdown(out))
+out_single = run_all(path_a, '明細表')
+check('單檔模式：不跑 _b、標題不加期別',
+      'within_period_b' not in out_single and check_title('within_period', out_single) == '前期累計 + 本期完成 = 累計至本期',
+      check_title('within_period', out_single))
+Path(path_a).unlink()
+Path(path_b).unlink()
 
 # ------------------------------------------------------------------
 # 結論/exit code：有檢查被略過時，不能算成「全部相符」

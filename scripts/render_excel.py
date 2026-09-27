@@ -39,7 +39,7 @@ def render_display(value, number_format):
     回傳：字串，模擬 Excel 顯示結果。無法判斷小數位數時預設當整數（0位）處理。
     """
     if value is None:
-        value = 0
+        return ''  # 空白格在 Excel 畫面上什麼都不顯示，跟格式無關；當成 0 會誤報格式不同
     if not isinstance(value, (int, float)):
         return str(value)
 

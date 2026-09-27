@@ -4,6 +4,8 @@ __pycache__/
 # 不要把實際估驗計價/契約文件（含案件機敏資料）放進版控
 *.xlsx
 *.xls
+# 例外：練習用範例檔是假資料，要跟著 repo 走
+!examples/*.xlsx
 ~$*.xlsx
 ~$*.xls
 
