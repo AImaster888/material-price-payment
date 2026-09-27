@@ -45,7 +45,7 @@ from openpyxl.utils import column_index_from_string
 sys.path.insert(0, str(Path(__file__).parent))
 from render_excel import render_display  # noqa: E402
 
-__version__ = '1.1.0'  # 2026-08-25
+__version__ = '1.2.0'  # 2026-09-27
 
 GROUP_NAMES = ['原契約', '原派工', '第一次變更設計', '第一次變更設計(議價前)', '前期累計', '本期完成', '累計至本期']
 GROUP_SYNONYMS = {'原派工': '原契約'}  # 不同期的檔案可能對同一個群組用不同標題文字
@@ -411,8 +411,21 @@ def check_subitem_sum(wf, wv, layout, group='本期完成'):
     return results, None
 
 
-def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b):
-    """比對 A檔「累計至本期」vs B檔「前期累計」的畫面顯示文字（不論底層數值）。"""
+DISPLAY_CAUSE_FORMAT = '格式不同（數字相同）'
+DISPLAY_CAUSE_VALUE = '數字不同'
+
+
+def _same_value(v1, v2, tol):
+    return abs((_num(v1) or 0) - (_num(v2) or 0)) < tol
+
+
+def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b, tol_qty=0.0001, tol_amt=0.5):
+    """比對 A檔「累計至本期」vs B檔「前期累計」的畫面顯示文字（不論底層數值）。
+
+    顯示不一致時，另外比對底層數值標出 cause：格式問題（統一格式即可）跟數字真的
+    不同（要改金額）處理方式完全不同，不能讓讀報告的人或 AI 自己去猜。
+    容錯值跟 check_cross_period 一致。
+    """
     a_q, a_a = layout_a.col('累計至本期', '數量'), layout_a.col('累計至本期', '複價')
     b_q, b_a = layout_b.col('前期累計', '數量'), layout_b.col('前期累計', '複價')
     if a_a is None or b_a is None:
@@ -431,14 +444,23 @@ def check_display_text_cross(wv_a, wf_a, layout_a, wv_b, wf_b, layout_b):
         if br is None:
             continue
         qd1 = qd2 = None
+        q_same = True
         if a_q and b_q:
-            qd1 = render_display(wv_a.cell(row=r, column=a_q).value, wf_a.cell(row=r, column=a_q).number_format)
-            qd2 = render_display(wv_b.cell(row=br, column=b_q).value, wf_b.cell(row=br, column=b_q).number_format)
-        ad1 = render_display(wv_a.cell(row=r, column=a_a).value, wf_a.cell(row=r, column=a_a).number_format)
-        ad2 = render_display(wv_b.cell(row=br, column=b_a).value, wf_b.cell(row=br, column=b_a).number_format)
+            qv1, qv2 = wv_a.cell(row=r, column=a_q).value, wv_b.cell(row=br, column=b_q).value
+            qd1 = render_display(qv1, wf_a.cell(row=r, column=a_q).number_format)
+            qd2 = render_display(qv2, wf_b.cell(row=br, column=b_q).number_format)
+            q_same = _same_value(qv1, qv2, tol_qty)
+        av1, av2 = wv_a.cell(row=r, column=a_a).value, wv_b.cell(row=br, column=b_a).value
+        ad1 = render_display(av1, wf_a.cell(row=r, column=a_a).number_format)
+        ad2 = render_display(av2, wf_b.cell(row=br, column=b_a).number_format)
         q_match = (qd1 is None) or (qd1 == qd2)
         a_match = (ad1 == ad2)
-        results.append(dict(code=code, name=name, qty_disp_a=qd1, qty_disp_b=qd2, qty_match=q_match,
+        cause = ''
+        if not (q_match and a_match):
+            value_differs = (not q_match and not q_same) or (not a_match and not _same_value(av1, av2, tol_amt))
+            cause = DISPLAY_CAUSE_VALUE if value_differs else DISPLAY_CAUSE_FORMAT
+        results.append(dict(row=r, code=code, name=name, cause=cause,
+                             qty_disp_a=qd1, qty_disp_b=qd2, qty_match=q_match,
                              amt_disp_a=ad1, amt_disp_b=ad2, amt_match=a_match))
     return results, None
 
@@ -493,13 +515,21 @@ def print_summary(out):
             print('- {0}：⚠ 略過未檢查 — {1}'.format(title, skip))
             continue
         bad = [x for x in out[key] if not _row_ok(key, x)]
-        print('- {0}：共 {1} 項，異常 {2} 項'.format(title, len(out[key]), len(bad)))
+        print('- {0}：共 {1} 項，異常 {2} 項{3}'.format(title, len(out[key]), len(bad), _cause_breakdown(key, bad)))
         for x in bad[:20]:
             print('    row/code={0} {1} -> {2}'.format(x.get('row', x.get('a_row')), x.get('code'), x))
         if len(bad) > 20:
             print('    …另有 {0} 筆異常沒列出來，跑 --md 看完整報告'.format(len(bad) - 20))
     print()
     print(conclusion_line(out))
+
+
+def _cause_breakdown(key, bad):
+    if key != 'display_text' or not bad:
+        return ''
+    n_fmt = sum(1 for x in bad if x['cause'] == DISPLAY_CAUSE_FORMAT)
+    return '，其中「{0}」{1} 項（統一格式即可）、「{2}」{3} 項（金額或數量要修正）'.format(
+        DISPLAY_CAUSE_FORMAT, n_fmt, DISPLAY_CAUSE_VALUE, len(bad) - n_fmt)
 
 
 def summarize(out):
@@ -592,7 +622,7 @@ def build_markdown(result):
             continue
         bad = [x for x in rows if not _row_ok(key, x)]
         lines.append('共 {0} 項，異常 {1} 項{2}'.format(
-            len(rows), len(bad), '（全數正確 ✓）' if not bad else ''))
+            len(rows), len(bad), '（全數正確 ✓）' if not bad else _cause_breakdown(key, bad)))
         lines.append('')
         if bad:
             if key == 'extended_price':
@@ -633,17 +663,23 @@ def build_markdown(result):
                         (x['code'] or '—'), x['name'], _fmt_num(x['a_qty']), _fmt_num(x['b_qty']),
                         _fmt_num(x['a_amt']), _fmt_num(x['b_amt']), problem))
             elif key == 'display_text':
-                lines.append('| 項次 | 工程項目 | 前一期顯示(數量) | 本期顯示(數量) | 前一期顯示(複價) | 本期顯示(複價) |')
-                lines.append('|---|---|---|---|---|---|')
+                lines.append('| 項次 | 工程項目 | 前一期顯示(數量) | 本期顯示(數量) | 前一期顯示(複價) | 本期顯示(複價) | 原因 |')
+                lines.append('|---|---|---|---|---|---|---|')
                 for x in bad:
-                    lines.append('| {0} | {1} | {2} | {3} | {4} | {5} |'.format(
+                    lines.append('| {0} | {1} | {2} | {3} | {4} | {5} | {6} |'.format(
                         (x['code'] or '—'), x['name'], x['qty_disp_a'], x['qty_disp_b'],
-                        x['amt_disp_a'], x['amt_disp_b']))
+                        x['amt_disp_a'], x['amt_disp_b'], x['cause']))
         lines.append('')
 
     lines.append('---')
     lines.append('**{0}**'.format(conclusion_line(result).replace('\n', '**\n\n**')))
     return '\n'.join(lines)
+
+
+def md_report_path(period_a, sheet_name):
+    """檔名要帶分頁名稱：同一組檔案通常兩張表都要核，不帶的話後跑的會蓋掉先跑的。"""
+    p = Path(period_a)
+    return p.with_name('{0}-{1}-核算報告.md'.format(p.stem, sheet_name))
 
 
 if __name__ == '__main__':
@@ -652,7 +688,7 @@ if __name__ == '__main__':
     ap.add_argument('period_b', nargs='?', default=None, help='本期估驗計價 xlsx 路徑（選填，給了才做跨期比對，順序不可顛倒）')
     ap.add_argument('--sheet', required=True, help='要核算的分頁名稱，例如「請款明細表」')
     ap.add_argument('--price-group', default='本期完成', help='複價核算要用哪個群組（預設：本期完成）')
-    ap.add_argument('--md', action='store_true', help='額外輸出 <period_a檔名>-核算報告.md（跟 period_a 同目錄）')
+    ap.add_argument('--md', action='store_true', help='額外輸出 <period_a檔名>-<分頁名稱>-核算報告.md（跟 period_a 同目錄）')
     ap.add_argument('--version', action='version', version=__version__)
     args = ap.parse_args()
 
@@ -666,7 +702,7 @@ if __name__ == '__main__':
     print_summary(result)
 
     if args.md:
-        md_path = Path(args.period_a).with_name(Path(args.period_a).stem + '-核算報告.md')
+        md_path = md_report_path(args.period_a, args.sheet)
         md_path.write_text(build_markdown(result), encoding='utf-8')
         print('\n已輸出：{0}'.format(md_path))
 

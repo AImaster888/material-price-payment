@@ -14,7 +14,7 @@ import openpyxl
 sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 from verify_payment import (SheetLayout, check_extended_price, check_within_period,  # noqa: E402
                              check_subitem_sum, check_cross_period, check_display_text_cross,
-                             summarize)
+                             summarize, md_report_path, DISPLAY_CAUSE_FORMAT, DISPLAY_CAUSE_VALUE)
 
 FAILURES = []
 
@@ -289,6 +289,34 @@ if results:
           results[0]['amt_match'] is False, str(results[0]))
     check('display_text 顯示文字確實不同（非誤判）',
           results[0]['amt_disp_a'] != results[0]['amt_disp_b'])
+    check('display_text 底層相同 -> 原因標為「格式不同（數字相同）」',
+          results[0]['cause'] == DISPLAY_CAUSE_FORMAT, str(results[0]))
+
+# display_text：數字真的不同（例如累計數量被誤植成固定值）-> 原因要標「數字不同」，不可說成格式問題
+rows_a = [dict(code='壹.二', name='數字不同', tq=30, ta=100)]
+rows_b = [dict(code='壹.二', name='數字不同', pq=0.3, pa=100)]
+wf_a, wv_a = save_and_reload(build_workbook(rows_a))
+wf_b, wv_b = save_and_reload(build_workbook(rows_b))
+results = check_display_text_cross(wv_a, wf_a, SheetLayout(wf_a), wv_b, wf_b, SheetLayout(wf_b))[0]
+check('display_text 底層不同 -> 原因標為「數字不同」',
+      len(results) == 1 and results[0]['cause'] == DISPLAY_CAUSE_VALUE, str(results))
+
+# display_text：完全一致的列不標原因
+rows_same = [dict(code='壹.三', name='一致', tq=1, ta=100)]
+rows_same_b = [dict(code='壹.三', name='一致', pq=1, pa=100)]
+wf_a, wv_a = save_and_reload(build_workbook(rows_same))
+wf_b, wv_b = save_and_reload(build_workbook(rows_same_b))
+results = check_display_text_cross(wv_a, wf_a, SheetLayout(wf_a), wv_b, wf_b, SheetLayout(wf_b))[0]
+check('display_text 顯示一致的列 cause 為空', results and results[0]['cause'] == '', str(results))
+
+# ------------------------------------------------------------------
+# --md 報告檔名要帶分頁名稱：同一組檔案先核請款明細表、再核計價總表，不可互相覆蓋
+# ------------------------------------------------------------------
+p1 = md_report_path('D:/案件/1150301-第一期.xlsx', '請款明細表')
+p2 = md_report_path('D:/案件/1150301-第一期.xlsx', '計價總表')
+check('md 報告檔名含分頁名稱', p1.name == '1150301-第一期-請款明細表-核算報告.md', str(p1))
+check('不同分頁的 md 報告檔名不同（不會互相覆蓋）', p1 != p2)
+check('md 報告放在前一期檔案同目錄', p1.parent == Path('D:/案件'), str(p1.parent))
 
 # ------------------------------------------------------------------
 # SheetLayout 資料列掃描：可以停，但不可以「靜靜地」停
