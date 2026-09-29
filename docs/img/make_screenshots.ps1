@@ -59,3 +59,6 @@ try {
     $excel.Quit()
     [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
 }
+
+# 截圖更新了，單檔版的快速上手也要重新打包，不然傳出去的還是舊圖
+python -X utf8 (Join-Path $root "docs\build_quickstart.py")

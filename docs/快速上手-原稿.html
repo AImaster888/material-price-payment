@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<!--
+  估驗計價核算技能 — 快速上手（給一般同仁看）
+  版本 v1.1（2026-09-29／民國 115.09.29）｜對應技能 v1.3.0
+  ★ 這是「原稿」：要改內容就改這份，改完執行 python docs\build_quickstart.py，
+    會把 img\ 的截圖包進去，產生可以單獨傳給別人的 docs\快速上手.html。
+    不要直接改 快速上手.html（會被重新產生覆蓋）。
+  截圖來源：examples\ 練習用假資料，用 docs\img\make_screenshots.ps1 由 Excel 產生
+  詳細說明（給維護的人）：docs\詳細說明.md
+-->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>估驗計價核算 快速上手</title>
+<style>
+:root{--ink:#22271f;--paper:#f5f7f3;--line:#dcdfd6;--accent:#2f5233;--soft:#e7efe7;
+--warn:#9c2b2b;--warn-bg:#fdeaea;--note:#fff8e1;--note-line:#f0d98c;--blue:#2c4a66;--blue-bg:#eef4f9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;
+line-height:1.8;font-size:16px;padding:24px 16px}
+.wrap{max-width:980px;margin:auto}
+header{border-bottom:3px solid var(--accent);padding-bottom:10px;margin-bottom:22px}
+h1{margin:0;font-size:26px;color:var(--accent)}
+.sub{color:#6c716a;font-size:14px}
+.lead{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;font-size:17px}
+.step{background:#fff;border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:10px;
+padding:16px 20px;margin:18px 0}
+.step h2{margin:0 0 6px;font-size:20px;display:flex;align-items:center;gap:10px}
+.num{display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;
+align-items:center;justify-content:center;font-size:18px;flex:none}
+.step.once{border-left-color:#8a8f86}
+.step.once .num{background:#8a8f86}
+.step ol,.step ul{margin:6px 0;padding-left:24px}
+code,kbd{background:#eef1ec;padding:1px 6px;border-radius:4px;font-family:Consolas,ui-monospace,monospace;font-size:14px}
+kbd{border:1px solid #c9ccc3;background:#fff}
+.say{background:var(--blue-bg);border:1px solid #c9d8e6;border-radius:8px;padding:12px 14px;margin:10px 0;position:relative}
+.say .t{font-size:13px;font-weight:700;color:var(--blue)}
+.say .text{white-space:pre-wrap;word-break:break-all;font-size:15px;margin-top:4px}
+.copy{position:absolute;top:8px;right:8px;border:1px solid var(--blue);background:#fff;color:var(--blue);
+border-radius:6px;padding:3px 10px;font-size:13px;cursor:pointer;font-family:inherit}
+.note{background:var(--note);border:1px solid var(--note-line);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:15px}
+.danger{background:var(--warn-bg);border:1px solid #e5b8b8;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:15px}
+.danger b{color:var(--warn)}
+table{width:100%;border-collapse:collapse;background:#fff;font-size:15px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{background:var(--soft)}
+.ok{color:#186a2e;font-weight:700}
+.bad{color:var(--warn);font-weight:700}
+pre.out{background:#22271f;color:#e8f0e8;border-radius:8px;padding:12px 14px;font-size:13.5px;line-height:1.65;
+overflow-x:auto;white-space:pre}
+details{border:1px solid var(--line);border-radius:8px;margin:12px 0;background:#fcfdfb}
+summary{cursor:pointer;padding:10px 14px;font-weight:700;font-size:16.5px}
+details[open] summary{border-bottom:1px solid var(--line)}
+.case{padding:6px 16px 12px}
+figure{margin:10px 0}
+figure img{width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+figcaption{font-size:14px;color:#6c716a}
+.tag{display:inline-block;border-radius:12px;padding:0 10px;font-size:13px;font-weight:700;margin-right:6px}
+.tag.v{background:var(--warn-bg);color:var(--warn)}
+.tag.f{background:var(--soft);color:var(--accent)}
+.tag.s{background:var(--note);color:#854f0b}
+.check li{list-style:none;margin:4px 0}
+.check li::before{content:"☐ ";font-size:18px}
+footer{margin-top:30px;border-top:1px solid var(--line);padding-top:10px;font-size:13px;color:#6c716a}
+@media print{
+ body{background:#fff;padding:0;font-size:13.5px}
+ .copy{display:none}
+ .step,details,figure{page-break-inside:avoid}
+ pre.out{background:#fff;color:#000;border:1px solid #999}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+<h1>估驗計價核算 快速上手</h1>
+<div class="sub">給審估驗計價的同仁看｜不用會寫程式｜手冊 v1.1（115.09.29）・技能 v1.3.0</div>
+</header>
+
+<div class="lead">
+把<b>前一期</b>和<b>本期</b>兩份估驗計價 Excel 交給 Claude，它會逐列核對：乘法、加總、兩期銜接、畫面顯示的數字，把對不起來的地方指出來。
+<b>數字都是程式從 Excel 讀出來算的，AI 不心算。</b>最後要不要改、怎麼改，由你確認。
+</div>
+
+<!-- ─────────── 0 ─────────── -->
+<section class="step once">
+<h2><span class="num">0</span>第一次使用：安裝（每台電腦做一次）</h2>
+<ol>
+<li>還沒有這個工具的話：到 <a href="https://github.com/AImaster888/material-price-payment" target="_blank" rel="noopener">github.com/AImaster888/material-price-payment</a>，按綠色 <b>Code</b> → <b>Download ZIP</b>，解壓縮到 <code>D:\320code\material-price-payment</code>。</li>
+<li>開啟 <b>PowerShell</b>（開始功能表搜尋「PowerShell」）。</li>
+<li>貼上下面兩行，按 <kbd>Enter</kbd>：</li>
+</ol>
+<div class="say"><div class="t">貼到 PowerShell</div><button class="copy" type="button">複製</button>
+<div class="text">cd D:\320code\material-price-payment
+.\setup.ps1</div></div>
+<ol start="4">
+<li>看到「<b>安裝完成！</b>」就好了，<b>重新開啟 Claude Code</b>。</li>
+<li>接著照下面第 1～5 步，<b>先用「練習用範例檔」跑一次</b>，結果跟 <a href="#practice">練習對答案</a> 一樣，就代表裝好、也會用了。</li>
+</ol>
+</section>
+
+<!-- ─────────── 1 ─────────── -->
+<section class="step">
+<h2><span class="num">1</span>準備兩份檔案</h2>
+<ul>
+<li><b>前一期</b>和<b>本期</b>的估驗計價 xlsx，檔名建議開頭放日期，一眼看出誰先誰後（例：<code>1150301-第一期.xlsx</code>、<code>1150401-第二期.xlsx</code>）。</li>
+<li>兩個檔案都<b>先關掉</b>，而且要是 Excel <b>存過檔</b>的版本。</li>
+<li>通常要核兩張分頁：<b>請款明細表</b>（逐項明細）和<b>計價總表</b>（分類彙總）。</li>
+</ul>
+<div class="note">📁 練習用範例檔（假資料，可以放心亂試）：<br>
+<code>D:\320code\material-price-payment\examples\練習用-第一期估驗計價.xlsx</code><br>
+<code>D:\320code\material-price-payment\examples\練習用-第二期估驗計價.xlsx</code></div>
+<figure><img src="img/01-請款明細表.png" alt="練習用第一期請款明細表">
+<figcaption>練習用範例檔長這樣：左邊項次、工程項目，右邊依序是原契約、前期累計、本期完成、累計至本期。</figcaption></figure>
+</section>
+
+<!-- ─────────── 2 ─────────── -->
+<section class="step">
+<h2><span class="num">2</span>在 Claude Code 說這段話</h2>
+<p>把路徑換成你的檔案，<b>一定要講清楚誰是前一期</b>（順序反了，結果會全錯）。</p>
+<div class="say"><div class="t">🗣 對 Claude 說（練習版，可以直接複製）</div><button class="copy" type="button">複製</button>
+<div class="text">幫我核對估驗計價。前一期是 D:\320code\material-price-payment\examples\練習用-第一期估驗計價.xlsx，本期是 D:\320code\material-price-payment\examples\練習用-第二期估驗計價.xlsx。請款明細表和計價總表都要核，並產生核算報告。</div></div>
+<p>兩期一起核的時候，每一份自己的「乘法」「加總」「小計」也會各核一次，報告會分別寫「（前一期）」「（本期）」，看得出錯在哪一份。</p>
+</section>
+
+<!-- ─────────── 3 ─────────── -->
+<section class="step">
+<h2><span class="num">3</span>先看「結論」那一句</h2>
+<p>Claude 會把結果翻成白話，最後一定有一句結論。先看這句：</p>
+<table>
+<tr><th style="width:40%">結論長這樣</th><th>意思</th><th style="width:28%">接下來</th></tr>
+<tr><td class="ok">已跑的檢查全數相符，未發現異常</td><td>都對得起來</td><td>做第 5 步的檢核清單就完成</td></tr>
+<tr><td class="bad">共發現 N 筆異常</td><td>有地方對不起來，下面會逐筆列出</td><td>做第 4 步</td></tr>
+<tr><td class="bad">⚠ 有 N 項檢查因為欄位不齊沒跑到</td><td>有一項<b>根本沒核</b>，不是核過沒問題</td><td>那一項要人工看（見第 4 步狀況 D）</td></tr>
+<tr><td class="bad">無法核算：……</td><td>檔案路徑、分頁名稱打錯，或表格格式認不得</td><td>照訊息修正後重來；分頁名稱它會列給你照抄</td></tr>
+</table>
+<p>核算報告會存在<b>前一期檔案旁邊</b>，檔名像 <code>練習用-第一期估驗計價-計價總表-核算報告.md</code>，每張分頁一份。</p>
+</section>
+
+<!-- ─────────── 4 ─────────── -->
+<section class="step">
+<h2><span class="num">4</span>逐筆確認異常（四種常見狀況）</h2>
+<p>先記住一件事：<b>好幾筆異常常常是同一個原因造成的</b>。練習檔的計價總表報 8 筆，其實只有 3 個原因＋1 項沒核到。</p>
+<p>到 Excel 確認時會用到的三個動作：</p>
+<ul>
+<li><b>看一格是不是公式</b>：點那一格，看上方資料編輯列；<code>=</code> 開頭才是公式。</li>
+<li><b>一次看整張表的公式</b>：按 <kbd>Ctrl</kbd>＋<kbd>`</kbd>（數字 1 左邊那個鍵），再按一次切回來。</li>
+<li><b>看小數位數設定</b>：選那一格按 <kbd>Ctrl</kbd>＋<kbd>1</kbd> →「數值」→「小數位數」。</li>
+</ul>
+
+<details open>
+<summary><span class="tag v">數字不同</span>狀況 A：前一期改了，本期沒跟著改</summary>
+<div class="case">
+<p>報告會出現「<b>跨期銜接比對</b>」異常：前一期的「累計至本期」和本期的「前期累計」不一樣。</p>
+<figure><img src="img/02-A-第一期累計.png" alt="第一期累計至本期">
+<figcaption>前一期：L11 物價調整金額累計 <b>12,000</b>（已修正後的數字）</figcaption></figure>
+<figure><img src="img/03-A-第二期前期累計.png" alt="第二期前期累計">
+<figcaption>本期：H11 前期累計還是修正前的 <b>12,500</b>，總計 H12 跟著差 500</figcaption></figure>
+<p><b>判斷</b>：物調和總計差額一樣（都是 500），是<b>同一個原因</b>，不是兩個問題。<br>
+<b>處理</b>：本期「前期累計」改成前一期的正確數字，<b>請款明細表和計價總表兩張都要改</b>。改之前先確認前一期的數字才是對的（例如有核定公文）。</p>
+</div>
+</details>
+
+<details open>
+<summary><span class="tag v">數字不同</span>狀況 B：公式被打成固定數字</summary>
+<div class="case">
+<p>報告會出現「<b>前期累計＋本期完成＝累計至本期</b>」異常，而且通常「跨期」和「畫面顯示」也會跟著報同一列。</p>
+<figure><img src="img/04-B-固定值誤植.png" alt="顯示公式模式">
+<figcaption>按 <kbd>Ctrl</kbd>＋<kbd>`</kbd> 顯示公式：J7 是公式 <code>=F7+H7</code>，J8 卻是固定數字 <b>30</b>（應該是 0.3，把 30% 打成 30）</figcaption></figure>
+<p><b>判斷</b>：金額對、數量錯，而且差很多，不像四捨五入 → 有人在公式格直接打了數字。<br>
+<b>處理</b>：把那格改回公式（照上一列的寫法，例：<code>=F8+H8</code>）。這一格改好，另外兩處的異常也會一起消失。</p>
+</div>
+</details>
+
+<details open>
+<summary><span class="tag f">格式不同（數字相同）</span>狀況 C：數字一樣，畫面長得不一樣</summary>
+<div class="case">
+<p>報告的「<b>畫面顯示文字比對</b>」會直接標出原因。標「格式不同（數字相同）」的，數字本身沒錯。</p>
+<figure><img src="img/05-C-第一期顯示.png" alt="第一期顯示兩位小數">
+<figcaption>前一期：J7 顯示 <b>0.37</b>（小數設 2 位）</figcaption></figure>
+<figure><img src="img/06-C-第二期顯示.png" alt="第二期顯示六位小數">
+<figcaption>本期：F7 顯示 <b>0.367188</b>（小數設 6 位）。背後其實是同一個數 0.3671875</figcaption></figure>
+<p><b>處理</b>：不用改數字，把兩期同一欄的小數位數設成一樣（<kbd>Ctrl</kbd>＋<kbd>1</kbd>）。不統一的話，審查的人對照兩期紙本會以為數字對不起來。</p>
+</div>
+</details>
+
+<details open>
+<summary><span class="tag s">⚠ 略過</span>狀況 D：出現「略過未檢查」</summary>
+<div class="case">
+<p>計價總表通常<b>沒有單價欄</b>，「單價 × 數量 ＝ 複價」這項沒辦法核，報告會出現 ⚠。</p>
+<p><b>處理</b>：這一項改用人工抽查，或以請款明細表的核算結果為準。<b>不能當成「核過沒問題」</b>。</p>
+</div>
+</details>
+
+<div class="danger"><b>技能不會幫你核的</b>：營業稅、品管費、利潤、保險這類「某幾項加總 × 百分比」的費用列；變更設計那一欄；<code>=A1+A2+A3</code> 這種手動加總的小計。這些請人工驗算。</div>
+</section>
+
+<!-- ─────────── 5 ─────────── -->
+<section class="step">
+<h2><span class="num">5</span>改完重跑，照清單檢核</h2>
+<p>Excel 改完<b>存檔</b>，回到第 2 步再核一次，直到結論是「<b>全數正確</b>」而且<b>沒有 ⚠</b>。最後照這張清單勾（可以印出來）：</p>
+<ul class="check">
+<li>前一期、本期的<b>順序正確</b>（報告開頭寫的「前一期檔案」確實是較早那期）</li>
+<li>請款明細表、計價總表<b>兩張都核過</b></li>
+<li>每一筆異常都知道原因：真的錯（改數字）／公式被蓋掉（改回公式）／只是格式（統一小數位數）</li>
+<li>差額一樣的多筆異常，已找出共同原因，沒有重複處理</li>
+<li>有 ⚠ 的項目、百分比費用列，已人工驗算</li>
+<li>修正後<b>存檔重跑</b>，結論是「全數正確」且沒有 ⚠</li>
+</ul>
+</section>
+
+<!-- ─────────── 練習對答案 ─────────── -->
+<section class="step once" id="practice">
+<h2><span class="num">✓</span>練習對答案（用範例檔跑的正確結果）</h2>
+<p>用練習用範例檔照第 2 步跑，應該得到下面的結果。一樣就代表安裝正確、你也會看報告了。</p>
+<table>
+<tr><th>分頁</th><th>結論</th><th>其實是幾個原因</th></tr>
+<tr><td>請款明細表</td><td class="bad">共發現 4 筆異常</td><td>1 個：狀況 A（物調沒同步，連帶總計，各在「跨期」「畫面顯示」報一次）</td></tr>
+<tr><td>計價總表</td><td class="bad">共發現 8 筆異常＋2 項 ⚠</td><td>3 個原因＋沒核到的：狀況 A（4 筆）、狀況 B（3 筆，都在前一期那份）、狀況 C（1 筆）、狀況 D（⚠ 前一期、本期各 1 項）</td></tr>
+</table>
+<details>
+<summary>計價總表的原始輸出（程式印的原文，給想對照細節的人）</summary>
+<div class="case">
+<pre class="out">=== 核算結果 ===
+- 單價 x 本期數量 = 複價（前一期）：⚠ 略過未檢查 — 缺少必要欄位（單價/數量/複價），略過此檢查
+- 前期累計 + 本期完成 = 累計至本期（前一期）：共 5 項，異常 1 項
+- 子項加總反查（前一期）：共 1 項，異常 0 項
+- 單價 x 本期數量 = 複價（本期）：⚠ 略過未檢查 — 缺少必要欄位（單價/數量/複價），略過此檢查
+- 前期累計 + 本期完成 = 累計至本期（本期）：共 5 項，異常 0 項
+- 子項加總反查（本期）：共 1 項，異常 0 項
+- 跨期銜接比對：共 5 項，異常 3 項
+- 畫面顯示文字比對：共 5 項，異常 4 項，其中「格式不同（數字相同）」1 項（統一格式即可）、「數字不同」3 項（金額或數量要修正）
+
+結論：共發現 8 筆異常。
+⚠ 但有 2 項檢查因為欄位不齊沒跑到（單價 x 本期數量 = 複價（前一期）、單價 x 本期數量 = 複價（本期）），不能回報「全部相符」。</pre>
+<table>
+<tr><th>輸出裡的字</th><th>意思</th></tr>
+<tr><td><code>a_</code>／<code>b_</code> 開頭</td><td>前一期／本期的值</td></tr>
+<tr><td><code>qty</code>／<code>amt</code></td><td>數量／複價（金額）</td></tr>
+<tr><td><code>_ok: False</code>、<code>_match: False</code></td><td>這一欄對不起來</td></tr>
+<tr><td><code>exp_</code>／<code>tot_</code></td><td>照算式應該是多少／檔案裡實際寫多少</td></tr>
+<tr><td><code>row</code></td><td>Excel 第幾列，可以直接去那一列看</td></tr>
+<tr><td><code>cause</code></td><td>畫面不一致的原因：「格式不同（數字相同）」或「數字不同」</td></tr>
+</table>
+</div>
+</details>
+</section>
+
+<footer>
+估驗計價核算 快速上手｜手冊 v1.1（2026-09-29／115.09.29），對應技能 v1.3.0<br>
+更完整的說明（技能規則、檔案用途、常見問題）見 <a href="https://github.com/AImaster888/material-price-payment/blob/master/docs/%E8%A9%B3%E7%B4%B0%E8%AA%AA%E6%98%8E.md" target="_blank" rel="noopener">詳細說明</a>。截圖全部來自練習用假資料，不含真實案件。
+</footer>
+
+</div>
+<script>
+document.querySelectorAll('.copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = btn.parentElement.querySelector('.text').textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.textContent = '已複製 ✓';
+      setTimeout(function () { btn.textContent = '複製'; }, 1800);
+    }, function () { prompt('請手動複製：', text); });
+  });
+});
+// 列印時把收合的段落全部展開，紙本才不會漏內容
+window.addEventListener('beforeprint', function () {
+  document.querySelectorAll('details').forEach(function (d) { d.open = true; });
+});
+</script>
+</body>
+</html>
