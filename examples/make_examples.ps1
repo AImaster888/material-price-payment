@@ -24,3 +24,8 @@ try {
     $excel.Quit()
     [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
 }
+
+# Excel 存檔會把本機使用者名稱寫進「上次修改者」，範例檔要公開，一定要清掉
+$files = Get-ChildItem -Path $dir -Filter "*.xlsx" | ForEach-Object { $_.FullName }
+python -X utf8 (Join-Path $dir "strip_metadata.py") @files
+if ($LASTEXITCODE -ne 0) { exit 1 }
