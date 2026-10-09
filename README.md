@@ -11,7 +11,7 @@
 - [實際操作篇（約 3 分鐘）](https://youtu.be/IBXLm9KcEMg)：開啟 Claude Code → 開啟技能 → 貼上送出 → 看結果 → 修正後再跑一次
 - [完整版教學（約 8 分鐘）](https://youtu.be/xD_oP3ojHTs)：能做什麼、怎麼用、四種常見異常怎麼判斷與修正
 
-台灣公共工程「估驗計價」文件逐項核算工具。給 Claude Code 用的 skill，也可以
+「估驗計價」文件逐項核算工具。給 Claude Code 用的 skill，也可以
 單獨當 CLI 腳本用。
 
 ## 這個工具在解決什麼問題
