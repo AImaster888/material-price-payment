@@ -164,6 +164,18 @@
   .opt .side2 .lab { display: inline-block; font-size: 30px; font-weight: 800; color: #fff; background: var(--navy); padding: 6px 24px; border-radius: 999px; }
   .opt .side2 .big2 { font-size: 46px; font-weight: 800; margin: 26px 0 14px; font-family: Consolas, "NotoTC", sans-serif; color: var(--warn); }
   .opt .side2 p { font-size: 32px; color: var(--muted); line-height: 1.5; }
+  /* 修正重跑 */
+  .steps.five { gap: 18px; }
+  .steps.five .step { font-size: 36px; padding: 18px 24px; white-space: nowrap; }
+  .steps.five .to { font-size: 44px; }
+  .flow.sm { gap: 26px; margin-top: 80px; }
+  .flow.sm .box { font-size: 42px; padding: 30px 38px; }
+  .flow.sm .to { font-size: 70px; }
+  .box.warn { background: var(--warn-bg); border-color: #f4c7ab; color: var(--warn); }
+  .loopback { text-align: center; font-size: 42px; font-weight: 800; color: var(--warn); margin-top: 40px; }
+  .tip.no i { background: var(--red); }
+  .tip.no { color: var(--red); }
+  .tip.yes i { background: var(--ok); }
   .url { margin-top: 50px; font-size: 40px; font-family: Consolas, monospace; color: var(--gold); letter-spacing: .02em; }
 </style>
 </head>
@@ -350,14 +362,16 @@ PS&gt; .\setup.ps1
 <!-- 改完重跑 -->
 <section class="card" id="c11">
   <div class="corner">改完重跑</div>
-  <h2 class="center">改完一定重跑</h2>
+  <h2 class="center">改完一定重跑，直到沒有異常</h2>
   <div class="flow">
     <div class="box">Excel 修正<small>存檔</small></div>
     <div class="to">→</div>
-    <div class="box">再核一次<small>同一句話</small></div>
+    <div class="box">再跑一次技能<small>同一句話</small></div>
     <div class="to">→</div>
-    <div class="box ok">全數正確<small>而且沒有略過項目</small></div>
+    <div class="box ok">沒有異常<small>略過項目已人工驗算</small></div>
   </div>
+  <div class="loopback">↺ 還有異常，就再修正、再跑一次</div>
+  <div class="promise">重點不是跑完一次，而是<b>問題有沒有解決</b></div>
 </section>
 
 <!-- 第三段：今天學到什麼 -->
@@ -368,7 +382,7 @@ PS&gt; .\setup.ps1
     <div class="row"><div class="k">1</div><h3>能做什麼</h3><p>五項檢查：乘法、加總、跨期、小計、畫面顯示</p></div>
     <div class="row"><div class="k">2</div><h3>怎麼用</h3><p>準備兩份檔案 → 說一句話 → 看結論，前一期放前面</p></div>
     <div class="row"><div class="k">3</div><h3>四種狀況</h3><p>沒同步、公式被蓋、只是格式、略過沒核到</p></div>
-    <div class="row"><div class="k">4</div><h3>改完重跑</h3><p>直到全數正確、沒有略過項目</p></div>
+    <div class="row"><div class="k">4</div><h3>改完重跑</h3><p>重跑到沒有異常，略過項目人工驗算，才算結束</p></div>
   </div>
 </section>
 
@@ -391,37 +405,38 @@ PS&gt; .\setup.ps1
 </section>
 
 <section class="card dark" id="o02">
-  <div class="eyebrow">一共四步</div>
-  <h1>四個步驟</h1>
+  <div class="eyebrow">一共五步</div>
+  <h1>五個步驟</h1>
   <div class="bar"></div>
-  <div class="steps">
+  <div class="steps five">
     <div class="step"><i>1</i>開啟 Claude Code</div><span class="to">→</span>
     <div class="step"><i>2</i>開啟技能</div><span class="to">→</span>
     <div class="step"><i>3</i>貼上送出</div><span class="to">→</span>
-    <div class="step"><i>4</i>看結果</div>
+    <div class="step"><i>4</i>看結果</div><span class="to">→</span>
+    <div class="step"><i>5</i>修正重跑</div>
   </div>
 </section>
 
 <section class="card op" id="o03">
-  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>打開 Claude 桌面程式，點上方的「Code」</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on mark">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div></div><div class="main"><div class="msgs"></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
 </section>
 
 <section class="card op" id="o04">
-  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>按「新工作階段」，資料夾選這個</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new mark">＋ 新工作階段</div></div><div class="main"><div class="pick"><h4>選擇資料夾</h4><div class="row2">D:\320code\</div><div class="row2 on">D:\320code\material-price-payment</div><div class="row2">D:\2ndbrain\</div></div></div></div></div>
 </section>
 
 <section class="card op" id="o05">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>在輸入框打「/」，點 material-price-payment</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"></div><div class="input mark">/material<span class="cur"></span><div class="pop"><div class="on"><b>/material-price-payment</b>估驗計價逐項核算工具</div><div><b>/markitdown-convert</b>轉 Markdown</div></div></div></div></div></div>
 </section>
 
 <section class="card" id="o06">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2 class="center">開啟技能，兩種方法都可以</h2>
   <div class="opt">
     <div class="side2"><span class="lab">方法一　打斜線</span><div class="big2">/material-price-payment</div><p>從清單點選，最直接</p></div>
@@ -430,31 +445,31 @@ PS&gt; .\setup.ps1
 </section>
 
 <section class="card op" id="o07">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>貼上手冊那段話，按 Enter 送出</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"></div><div class="input mark">幫我核對估驗計價。前一期是 D:\320code\material-price-payment\examples\練習用-第一期估驗計價.xlsx，本期是 D:\320code\material-price-payment\examples\練習用-第二期估驗計價.xlsx。請款明細表和計價總表都要核，並產生核算報告。</div></div></div></div>
 </section>
 
 <section class="card op" id="o08">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>跳出詢問時，按「允許」</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="a">好的，先核對「請款明細表」，前一期在前、本期在後。</div></div><div class="ask"><div class="q">要讓 Claude 執行這個指令嗎？</div><div class="cmd">python verify_payment.py "練習用-第一期估驗計價.xlsx" "練習用-第二期估驗計價.xlsx" --sheet 請款明細表 --md</div><div class="btns"><span class="yes">允許</span><span>拒絕</span></div></div></div></div></div>
 </section>
 
 <section class="card op" id="o09">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span><span>5 修正重跑</span></div>
   <h2>它會自己跑，兩張分頁各一次</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="tool">▶ verify_payment.py … --sheet 請款明細表 --md　　完成</div><div class="tool">▶ verify_payment.py … --sheet 計價總表 --md　　執行中…</div></div><div class="input"><span class="ph">稍等一下…</span></div></div></div></div>
 </section>
 
 <section class="card op" id="o10">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span><span>5 修正重跑</span></div>
   <h2>先看結論那一句</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="a"><b>核算完成：</b><br>請款明細表：<em>共發現 4 筆異常</em>（物價調整金額沒同步，連帶總計）<br>計價總表：<em>共發現 8 筆異常＋2 項略過未檢查</em><br>核算報告存在前一期檔案旁邊，每張分頁一份。</div></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
 </section>
 
 <section class="card op" id="o11">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span><span>5 修正重跑</span></div>
   <h2>核算報告存在前一期檔案旁邊</h2>
   <div class="folder" style="margin-top:40px">
     <div class="path">D:\320code\material-price-payment\examples\</div>
@@ -466,20 +481,56 @@ PS&gt; .\setup.ps1
 </section>
 
 <section class="card op" id="o12">
-  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span><span>5 修正重跑</span></div>
   <h2>看不懂就直接問</h2>
   <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="a"><b>核算完成：</b><br>請款明細表：<em>共發現 4 筆異常</em>（物價調整金額沒同步，連帶總計）<br>計價總表：<em>共發現 8 筆異常＋2 項略過未檢查</em><br>核算報告存在前一期檔案旁邊，每張分頁一份。</div><div class="u">物價調整金額那筆是什麼原因？要怎麼改？</div><div class="a">前一期累計是 <b>12,000</b>，本期的前期累計還是修正前的 <b>12,500</b>，總計也跟著差 500，是同一個原因。<br>先確認前一期的數字是對的，再把本期「前期累計」改成 12,000，請款明細表和計價總表兩張都要改。</div></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
 </section>
 
+<section class="card op" id="o14">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span class="on">5 修正重跑</span></div>
+  <h2>修正後再跑一次，直到沒有異常</h2>
+  <div class="flow sm">
+    <div class="box">看結果</div><div class="to">→</div>
+    <div class="box warn">有異常</div><div class="to">→</div>
+    <div class="box">到 Excel 修正<small>存檔</small></div><div class="to">→</div>
+    <div class="box">再跑一次技能<small>同一句話</small></div>
+  </div>
+  <div class="loopback">↺ 再看一次結果，還有異常就重複</div>
+  <div class="promise">重點不是跑完一次，而是<b>問題有沒有解決</b></div>
+</section>
+
+<section class="card op" id="o15">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span class="on">5 修正重跑</span></div>
+  <h2>改好了，跟它說「再核一次」</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs">
+    <div class="u">我把 Excel 改好存檔了，兩張表再核一次。</div>
+    <div class="tool">▶ verify_payment.py … --sheet 請款明細表 --md　　完成</div>
+    <div class="tool">▶ verify_payment.py … --sheet 計價總表 --md　　完成</div>
+    <div class="a"><b>重新核算結果（示意）：</b><br>請款明細表：<em>已跑的檢查全數相符</em><br>
+    計價總表：<em>沒有異常</em>；另有 2 項「單價 × 數量」略過未檢查，請人工驗算。</div>
+  </div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
+</section>
+
+<section class="card op" id="o16">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span><span class="on">5 修正重跑</span></div>
+  <h2>什麼時候才算結束？</h2>
+  <div class="tips">
+    <div class="tip yes"><i>✓</i>結論：沒有異常</div>
+    <div class="tip yes"><i>✓</i>略過、不核的項目，已經人工驗算</div>
+    <div class="tip no"><i>✕</i>只跑一次就交差，不算完成</div>
+  </div>
+</section>
+
 <section class="card dark" id="o13">
   <div class="eyebrow">複習</div>
-  <h1>四步跑完一次核算</h1>
+  <h1>有錯就修，修完再跑</h1>
   <div class="bar"></div>
-  <div class="steps">
+  <div class="steps five">
     <div class="step"><i>1</i>開啟 Claude Code</div><span class="to">→</span>
     <div class="step"><i>2</i>開啟技能</div><span class="to">→</span>
     <div class="step"><i>3</i>貼上送出</div><span class="to">→</span>
-    <div class="step"><i>4</i>看結果</div>
+    <div class="step"><i>4</i>看結果</div><span class="to">→</span>
+    <div class="step"><i>5</i>修正重跑</div>
   </div>
   <div class="foot">異常怎麼判斷、怎麼改：請看完整版教學影片</div>
 </section>

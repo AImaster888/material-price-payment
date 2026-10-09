@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   估驗計價核算技能 — 快速上手（給一般同仁看）
-  版本 v1.1（2026-09-29／民國 115.09.29）｜對應技能 v1.3.0
+  版本 v1.2（2026-10-09／民國 115.10.09）｜對應技能 v1.3.0
   ★ 這是「原稿」：要改內容就改這份，改完執行 python docs\build_quickstart.py，
     會把 img\ 的截圖包進去，產生可以單獨傳給別人的 docs\快速上手.html。
     不要直接改 快速上手.html（會被重新產生覆蓋）。
@@ -77,7 +77,7 @@ footer{margin-top:30px;border-top:1px solid var(--line);padding-top:10px;font-si
 
 <header>
 <h1>估驗計價核算 快速上手</h1>
-<div class="sub">給審估驗計價的同仁看｜不用會寫程式｜手冊 v1.1（115.09.29）・技能 v1.3.0</div>
+<div class="sub">給審估驗計價的同仁看｜不用會寫程式｜手冊 v1.2（115.10.09）・技能 v1.3.0</div>
 </header>
 
 <div class="lead">
@@ -201,14 +201,15 @@ footer{margin-top:30px;border-top:1px solid var(--line);padding-top:10px;font-si
 <!-- ─────────── 5 ─────────── -->
 <section class="step">
 <h2><span class="num">5</span>改完重跑，照清單檢核</h2>
-<p>Excel 改完<b>存檔</b>，回到第 2 步再核一次，直到結論是「<b>全數正確</b>」而且<b>沒有 ⚠</b>。最後照這張清單勾（可以印出來）：</p>
+<p>Excel 改完<b>存檔</b>，回到第 2 步<b>再跑一次</b>。重點不是跑完一次，而是<b>問題有沒有解決</b>：還有異常就再修正、再跑，直到結論<b>沒有異常</b>。</p>
+<p>⚠ 略過的項目（例如計價總表沒有單價欄）重跑也不會消失，改用<b>人工驗算</b>補上，才算結束。最後照這張清單勾（可以印出來）：</p>
 <ul class="check">
 <li>前一期、本期的<b>順序正確</b>（報告開頭寫的「前一期檔案」確實是較早那期）</li>
 <li>請款明細表、計價總表<b>兩張都核過</b></li>
 <li>每一筆異常都知道原因：真的錯（改數字）／公式被蓋掉（改回公式）／只是格式（統一小數位數）</li>
 <li>差額一樣的多筆異常，已找出共同原因，沒有重複處理</li>
 <li>有 ⚠ 的項目、百分比費用列，已人工驗算</li>
-<li>修正後<b>存檔重跑</b>，結論是「全數正確」且沒有 ⚠</li>
+<li>修正後<b>存檔重跑</b>，重複到結論<b>沒有異常</b>為止（只跑一次不算完成）</li>
 </ul>
 </section>
 
@@ -250,7 +251,7 @@ footer{margin-top:30px;border-top:1px solid var(--line);padding-top:10px;font-si
 </section>
 
 <footer>
-估驗計價核算 快速上手｜手冊 v1.1（2026-09-29／115.09.29），對應技能 v1.3.0<br>
+估驗計價核算 快速上手｜手冊 v1.2（2026-10-09／115.10.09），對應技能 v1.3.0<br>
 更完整的說明（技能規則、檔案用途、常見問題）見 <a href="https://github.com/AImaster888/material-price-payment/blob/master/docs/%E8%A9%B3%E7%B4%B0%E8%AA%AA%E6%98%8E.md" target="_blank" rel="noopener">詳細說明</a>。截圖全部來自練習用假資料，不含真實案件。
 </footer>
 
