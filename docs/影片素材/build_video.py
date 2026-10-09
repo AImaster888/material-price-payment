@@ -9,7 +9,7 @@ import edge_tts
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.dirname(HERE)
-OUT = r"D:\320code\material-price-payment-教學影片"
+OUT = os.path.join(os.path.dirname(DOCS), "教學影片")  # 成品 mp4/srt，不進版控（見 .gitignore）
 WORK = os.path.join(os.environ.get("TEMP", "."), "mpp_video_work")
 NAME = "估驗計價核算工具_操作教學"
 VOICE, RATE = "zh-TW-HsiaoChenNeural", "+5%"

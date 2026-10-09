@@ -26,3 +26,6 @@ _tmp_*
 
 # 影片字卡 PNG 由 docs/影片素材/render_cards.py 從 字卡.html 產生，不進版控
 docs/影片素材/字卡/
+
+# 教學影片成品（mp4/srt）由 docs/影片素材/build_video.py 產生，影片放 YouTube，不進版控
+教學影片/
