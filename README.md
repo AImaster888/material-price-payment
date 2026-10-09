@@ -10,10 +10,20 @@
 
 點圖片在 YouTube 播放：
 
-| 實際操作篇（約 3 分鐘） | 完整版教學（約 8 分鐘） |
-|---|---|
-| [![實際操作篇](docs/img/影片封面-實際操作篇.jpg)](https://youtu.be/IBXLm9KcEMg) | [![完整版教學](docs/img/影片封面-完整版.jpg)](https://youtu.be/xD_oP3ojHTs) |
-| 開啟 Claude Code → 開啟技能 → 貼上送出 → 看結果 → 修正後再跑一次 | 能做什麼、怎麼用、四種常見異常怎麼判斷與修正 |
+<table>
+<tr>
+<th width="50%">實際操作篇（約 3 分鐘）</th>
+<th width="50%">完整版教學（約 8 分鐘）</th>
+</tr>
+<tr>
+<td><a href="https://youtu.be/IBXLm9KcEMg"><img src="docs/img/影片封面-實際操作篇.jpg" width="100%" alt="實際操作篇"></a></td>
+<td><a href="https://youtu.be/xD_oP3ojHTs"><img src="docs/img/影片封面-完整版.jpg" width="100%" alt="完整版教學"></a></td>
+</tr>
+<tr>
+<td>開啟 Claude Code → 開啟技能 → 貼上送出 → 看結果 → 修正後再跑一次</td>
+<td>能做什麼、怎麼用、四種常見異常怎麼判斷與修正</td>
+</tr>
+</table>
 
 「估驗計價」文件逐項核算工具。給 Claude Code 用的 skill，也可以
 單獨當 CLI 腳本用。
