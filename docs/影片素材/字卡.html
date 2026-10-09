@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>影片字卡</title>
+<!-- 估驗計價核算工具 教學影片字卡（1920x1080）。版型沿用 tra-art 教學影片字卡。
+     由 render_cards.py 逐張截成 PNG；data-hl 用來產生「目前講到第幾項」的反白版本。 -->
+<style>
+  @font-face { font-family: "NotoTC"; src: local("Noto Sans TC"), url("file:///C:/Windows/Fonts/NotoSansTC-VF.ttf"); font-weight: 100 900; }
+  :root {
+    --navy: #0f2a47; --navy-2: #1b4470; --ink: #0f172a; --muted: #64748b;
+    --paper: #f1f4f8; --line: #dbe3ec;
+    --warn: #e2611d; --warn-bg: #fdf0e8; --red: #c0262d; --red-bg: #fdecec;
+    --ok: #1f9d55; --ok-bg: #e8f6ee; --gold: #ffd166;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body { font-family: "NotoTC", "Microsoft JhengHei", sans-serif; color: var(--ink); background: var(--paper); }
+  .card { display: none; width: 1920px; height: 1080px; position: relative; overflow: hidden; padding: 80px 160px; }
+  .card.on { display: block; }
+  .corner { position: absolute; top: 40px; right: 64px; font-size: 26px; font-weight: 700; color: var(--navy); opacity: .7; letter-spacing: .05em; }
+  h2 { font-size: 76px; font-weight: 800; letter-spacing: .03em; }
+  .sub { font-size: 36px; color: var(--muted); margin-top: 14px; }
+  .center { text-align: center; }
+
+  /* 深藍底：片頭、段落轉場、收尾 */
+  .dark { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); color: #fff; }
+  .dark.on { display: flex; flex-direction: column; justify-content: center; }
+  .dark::before { content: ""; position: absolute; right: -220px; top: -220px; width: 900px; height: 900px; border-radius: 50%; background: rgba(255,255,255,.05); }
+  .eyebrow { font-size: 34px; letter-spacing: .3em; opacity: .75; font-weight: 500; }
+  .dark h1 { font-size: 128px; font-weight: 800; line-height: 1.15; margin: 28px 0 36px; letter-spacing: .04em; }
+  .bar { width: 120px; height: 8px; background: var(--gold); border-radius: 4px; margin-bottom: 44px; }
+  .tagline { font-size: 56px; font-weight: 500; }
+  .tagline b { color: var(--gold); font-weight: 800; }
+  .foot { position: absolute; left: 160px; bottom: 72px; font-size: 28px; opacity: .7; letter-spacing: .1em; }
+
+  /* 卡片格 */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 48px; }
+  .item { background: #fff; border: 2px solid var(--line); border-left: 12px solid var(--warn); border-radius: 20px; padding: 28px 44px; }
+  .item .n { font-size: 30px; font-weight: 800; color: var(--warn); letter-spacing: .1em; }
+  .item h3 { font-size: 50px; font-weight: 800; margin: 6px 0 8px; }
+  .item p { font-size: 32px; color: var(--muted); line-height: 1.5; }
+  .total { margin-top: 36px; text-align: right; font-size: 40px; font-weight: 600; color: var(--muted); }
+  .total b { font-size: 80px; color: var(--warn); font-weight: 900; }
+
+  /* 一句話＋大結論 */
+  .flow { display: flex; align-items: center; justify-content: center; gap: 40px; margin-top: 110px; }
+  .box { background: #fff; border: 3px solid var(--line); border-radius: 28px; padding: 40px 56px; font-size: 52px; font-weight: 800; text-align: center; }
+  .box small { display: block; font-size: 30px; color: var(--muted); font-weight: 600; margin-top: 8px; }
+  .box.ok { background: var(--ok-bg); border-color: #a9dcbd; color: var(--ok); }
+  .to { font-size: 90px; color: var(--navy); font-weight: 900; }
+  .promise { margin: 90px auto 0; width: fit-content; background: var(--navy); color: #fff; border-radius: 999px; padding: 26px 64px; font-size: 48px; font-weight: 700; letter-spacing: .06em; }
+  .promise b { color: var(--gold); }
+
+  /* 清單（五項檢查、回顧），data-hl 反白目前那一項 */
+  .list { margin-top: 44px; display: flex; flex-direction: column; gap: 22px; }
+  .row { display: flex; align-items: center; gap: 34px; background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 22px 40px; transition: none; }
+  .row .k { flex: none; width: 84px; height: 84px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 44px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .row h3 { font-size: 46px; font-weight: 800; flex: none; min-width: 560px; }
+  .row p { font-size: 32px; color: var(--muted); }
+  body[data-hl] .row { opacity: .35; }
+  body[data-hl="1"] .row:nth-child(1), body[data-hl="2"] .row:nth-child(2), body[data-hl="3"] .row:nth-child(3),
+  body[data-hl="4"] .row:nth-child(4), body[data-hl="5"] .row:nth-child(5) { opacity: 1; border: 4px solid var(--warn); box-shadow: 0 10px 30px rgba(226,97,29,.18); }
+  body[data-hl="1"] .row:nth-child(1) .k, body[data-hl="2"] .row:nth-child(2) .k, body[data-hl="3"] .row:nth-child(3) .k,
+  body[data-hl="4"] .row:nth-child(4) .k, body[data-hl="5"] .row:nth-child(5) .k { background: var(--warn); }
+
+  /* 四種狀況 */
+  .cases { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 52px; }
+  .case { border-radius: 24px; padding: 34px 44px; background: #fff; border: 2px solid var(--line); }
+  .case .lab { display: inline-block; font-size: 30px; font-weight: 800; color: #fff; padding: 4px 22px; border-radius: 999px; }
+  .case h3 { font-size: 50px; font-weight: 800; margin: 14px 0 6px; }
+  .case p { font-size: 32px; color: var(--muted); }
+  .case.v .lab { background: var(--red); } .case.f .lab { background: var(--ok); } .case.s .lab { background: #b7791f; }
+
+  /* 三個動作 */
+  .steps { display: flex; align-items: center; justify-content: center; gap: 36px; margin-top: 20px; }
+  .step { background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.28); border-radius: 22px; padding: 26px 48px; font-size: 54px; font-weight: 700; }
+  .step i { font-style: normal; color: var(--gold); font-size: 36px; margin-right: 14px; font-weight: 800; }
+  .steps .to { color: var(--gold); font-size: 60px; }
+
+  /* 警告 */
+  .alert { margin: 70px auto 0; max-width: 1450px; background: var(--red-bg); border: 4px solid #e9a5a8; border-radius: 30px; padding: 56px 70px; text-align: center; }
+  .alert .big { font-size: 92px; font-weight: 900; color: var(--red); line-height: 1.2; }
+  .alert p { font-size: 42px; font-weight: 600; margin-top: 26px; color: var(--ink); }
+  .tips { margin-top: 60px; display: flex; flex-direction: column; gap: 28px; }
+  .tip { display: flex; align-items: center; gap: 30px; font-size: 52px; font-weight: 700; background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 30px 44px; }
+  .tip i { font-style: normal; flex: none; width: 76px; height: 76px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+  .eq { display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 90px; font-size: 60px; font-weight: 800; }
+  .eq .num { font-size: 150px; font-weight: 900; color: var(--red); line-height: 1; }
+  .eq .num.g { color: var(--ok); } .eq .num.y { color: #b7791f; }
+  .eq small { display: block; font-size: 36px; color: var(--muted); text-align: center; font-weight: 600; margin-top: 10px; }
+  .nocheck { margin: 46px auto 0; max-width: 1450px; font-size: 36px; color: var(--muted); text-align: center; line-height: 1.6; }
+  /* 取代錄影的示意字卡（r01～r05） */
+  .term { margin: 44px auto 0; max-width: 1500px; background: #0c1220; border-radius: 22px; overflow: hidden; box-shadow: 0 14px 40px rgba(15,42,71,.25); }
+  .term .tb { background: #1f2937; color: #cbd5e1; font-size: 26px; padding: 14px 28px; }
+  .term pre { font-family: Consolas, "Microsoft JhengHei", monospace; font-size: 34px; line-height: 1.55; color: #e5e7eb; padding: 26px 36px; white-space: pre-wrap; }
+  .term .y { color: #facc15; } .term .g { color: #4ade80; } .term .c { color: #67e8f9; } .term .hi { color: #4ade80; font-weight: 800; font-size: 40px; }
+  .folder { margin: 50px auto 0; max-width: 1500px; background: #fff; border: 2px solid var(--line); border-radius: 22px; overflow: hidden; }
+  .folder .path { background: #e7eef6; font-size: 34px; padding: 22px 36px; font-family: Consolas, "Microsoft JhengHei", monospace; color: var(--navy); }
+  .folder .f { display: flex; align-items: center; gap: 28px; font-size: 46px; font-weight: 700; padding: 30px 40px; border-top: 2px solid var(--line); }
+  .folder .ic { flex: none; width: 70px; height: 70px; border-radius: 12px; background: #1d6f42; color: #fff; font-size: 40px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .folder .f small { font-size: 30px; color: var(--muted); font-weight: 600; margin-left: auto; }
+  .chat { margin: 40px auto 0; max-width: 1560px; display: flex; flex-direction: column; gap: 26px; }
+  .bub { border-radius: 24px; padding: 26px 36px; font-size: 32px; line-height: 1.55; }
+  .bub b.who { display: block; font-size: 26px; color: var(--muted); margin-bottom: 6px; }
+  .bub.me { background: #fff; border: 2px solid var(--line); margin-left: 160px; }
+  .bub.ai { background: var(--navy); color: #fff; margin-right: 160px; }
+  .bub.ai b.who { color: #cbd5e1; }
+  .bub.ai .res { font-size: 38px; font-weight: 800; }
+  .bub.ai .res em { font-style: normal; color: var(--gold); }
+  .keys { display: flex; align-items: center; justify-content: center; gap: 34px; margin-top: 90px; }
+  .key { min-width: 200px; height: 170px; padding: 0 40px; border-radius: 26px; background: #fff; border: 4px solid #94a3b8; border-bottom-width: 14px; font-size: 80px; font-weight: 800; display: flex; align-items: center; justify-content: center; font-family: Consolas, "NotoTC", sans-serif; }
+  .key.hl { border-color: var(--warn); color: var(--warn); }
+  .plus { font-size: 90px; font-weight: 900; color: var(--navy); }
+  .keynote { text-align: center; font-size: 44px; font-weight: 700; margin-top: 56px; }
+  .keynote small { display: block; font-size: 34px; color: var(--muted); font-weight: 600; margin-top: 14px; }
+  .menu { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 60px; }
+  .menu .box { font-size: 44px; padding: 26px 44px; }
+  /* 實際操作篇（o01～o13）：Claude Code 桌面 App 示意畫面 */
+  .app { margin: 36px auto 0; width: 1600px; height: 720px; background: #fff; border: 2px solid #cbd5e1; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 16px 44px rgba(15,42,71,.16); }
+  .app .tb { height: 64px; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 12px; padding: 0 24px; font-size: 26px; color: var(--muted); }
+  .app .tb .dot { width: 16px; height: 16px; border-radius: 50%; background: #cbd5e1; }
+  .app .tabs { margin: 0 auto; display: flex; gap: 6px; background: #e2e8f0; border-radius: 12px; padding: 5px; }
+  .app .tabs span { padding: 6px 30px; border-radius: 9px; font-size: 26px; font-weight: 700; color: var(--muted); }
+  .app .tabs span.on { background: #fff; color: var(--ink); }
+  .app .tabs span.mark { outline: 5px solid var(--warn); outline-offset: 3px; }
+  .app .body { flex: 1; display: flex; min-height: 0; }
+  .app .side { width: 300px; background: #f8fafc; border-right: 2px solid #e2e8f0; padding: 24px; font-size: 24px; color: var(--muted); }
+  .app .side .new { background: var(--navy); color: #fff; border-radius: 12px; padding: 12px 18px; font-weight: 700; text-align: center; }
+  .app .side .new.mark { outline: 5px solid var(--warn); outline-offset: 4px; }
+  .app .side p { margin-top: 22px; }
+  .app .main { flex: 1; display: flex; flex-direction: column; padding: 26px 36px; gap: 20px; min-width: 0; }
+  .app .msgs { flex: 1; display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+  .app .u { align-self: flex-end; max-width: 92%; background: #eef2f7; border-radius: 18px; padding: 16px 24px; font-size: 26px; line-height: 1.5; }
+  .app .a { max-width: 96%; font-size: 27px; line-height: 1.55; }
+  .app .a b { color: var(--navy); }
+  .app .a em { font-style: normal; color: var(--warn); font-weight: 800; }
+  .app .tool { font-family: Consolas, monospace; font-size: 22px; color: var(--muted); background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; }
+  .app .input { border: 3px solid #cbd5e1; border-radius: 18px; padding: 18px 24px; font-size: 28px; color: var(--ink); min-height: 72px; position: relative; line-height: 1.5; }
+  .app .input.mark { border-color: var(--warn); box-shadow: 0 0 0 5px rgba(226,97,29,.18); }
+  .app .input .ph { color: #94a3b8; }
+  .app .input .cur { display: inline-block; width: 3px; height: 32px; background: var(--ink); vertical-align: middle; margin-left: 2px; }
+  .pop { position: absolute; left: 20px; bottom: calc(100% + 10px); width: 900px; background: #fff; border: 2px solid #cbd5e1; border-radius: 14px; box-shadow: 0 10px 30px rgba(15,42,71,.18); padding: 8px; }
+  .pop div { padding: 12px 18px; border-radius: 10px; font-size: 26px; color: var(--muted); }
+  .pop div b { color: var(--ink); font-family: Consolas, monospace; margin-right: 16px; }
+  .pop div.on { background: var(--warn-bg); outline: 4px solid var(--warn); }
+  .pick { margin: auto; width: 1000px; background: #fff; border: 2px solid #cbd5e1; border-radius: 18px; box-shadow: 0 10px 30px rgba(15,42,71,.18); padding: 28px 34px; }
+  .pick h4 { font-size: 30px; margin-bottom: 18px; }
+  .pick .row2 { font-size: 28px; padding: 14px 18px; border-radius: 10px; font-family: Consolas, "Microsoft JhengHei", monospace; color: var(--muted); }
+  .pick .row2.on { background: var(--warn-bg); color: var(--ink); font-weight: 700; outline: 4px solid var(--warn); }
+  .ask { margin: auto 0 0; border: 3px solid var(--warn); border-radius: 16px; padding: 22px 28px; background: var(--warn-bg); }
+  .ask .q { font-size: 28px; font-weight: 700; }
+  .ask .cmd { font-family: Consolas, monospace; font-size: 22px; color: var(--muted); margin: 10px 0 18px; }
+  .ask .btns { display: flex; gap: 16px; }
+  .ask .btns span { font-size: 28px; font-weight: 800; padding: 10px 34px; border-radius: 12px; border: 2px solid #cbd5e1; background: #fff; }
+  .ask .btns span.yes { background: var(--ok); color: #fff; border-color: var(--ok); outline: 5px solid var(--warn); outline-offset: 4px; }
+  .card.op { padding: 44px 160px; }
+  .card.op h2 { font-size: 58px; }
+  .stepbar { display: flex; gap: 14px; margin-bottom: 14px; }
+  .stepbar span { font-size: 26px; font-weight: 700; padding: 6px 22px; border-radius: 999px; background: #e2e8f0; color: var(--muted); }
+  .stepbar span.on { background: var(--navy); color: #fff; }
+  .opt { margin: 70px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 1600px; }
+  .opt .side2 { background: #fff; border: 3px solid var(--line); border-radius: 26px; padding: 40px 48px; }
+  .opt .side2 .lab { display: inline-block; font-size: 30px; font-weight: 800; color: #fff; background: var(--navy); padding: 6px 24px; border-radius: 999px; }
+  .opt .side2 .big2 { font-size: 46px; font-weight: 800; margin: 26px 0 14px; font-family: Consolas, "NotoTC", sans-serif; color: var(--warn); }
+  .opt .side2 p { font-size: 32px; color: var(--muted); line-height: 1.5; }
+  .url { margin-top: 50px; font-size: 40px; font-family: Consolas, monospace; color: var(--gold); letter-spacing: .02em; }
+</style>
+</head>
+<body>
+
+<!-- 片頭 -->
+<section class="card dark" id="c01">
+  <div class="eyebrow">操作教學影片</div>
+  <h1>估驗計價<br>逐項核算工具</h1>
+  <div class="bar"></div>
+  <div class="tagline">兩份 Excel＋一句話，<b>逐列核對</b></div>
+  <div class="foot">給審估驗計價的同仁｜不用會寫程式｜技能 v1.3.0</div>
+</section>
+
+<!-- 痛點 -->
+<section class="card" id="c02">
+  <div class="corner">估驗計價逐項核算工具</div>
+  <h2>每一期估驗計價，都要逐列對</h2>
+  <div class="sub">表格一長，最容易漏看的就是這幾件事</div>
+  <div class="grid">
+    <div class="item"><div class="n">01</div><h3>單價 × 數量</h3><p>每一列的複價對不對</p></div>
+    <div class="item"><div class="n">02</div><h3>前期＋本期＝累計</h3><p>同一份檔案自己加起來對不對</p></div>
+    <div class="item"><div class="n">03</div><h3>兩期接不接得起來</h3><p>前一期改了，本期常常忘記同步</p></div>
+    <div class="item"><div class="n">04</div><h3>畫面看起來不一樣</h3><p>小數位數不同，審查時被質疑</p></div>
+  </div>
+</section>
+
+<!-- 一句話介紹 -->
+<section class="card" id="c03">
+  <div class="corner">估驗計價逐項核算工具</div>
+  <h2 class="center">這個工具做什麼？</h2>
+  <div class="flow">
+    <div class="box">前一期<small>Excel</small></div>
+    <div class="box">本期<small>Excel</small></div>
+    <div class="to">＋</div>
+    <div class="box">說一句話<small>Claude Code</small></div>
+    <div class="to">→</div>
+    <div class="box ok">逐列核對<small>對不起來的直接指出</small></div>
+  </div>
+  <div class="promise">數字由<b>程式</b>從 Excel 讀出來算，AI 不心算</div>
+</section>
+
+<!-- 五項檢查 -->
+<section class="card" id="c04">
+  <div class="corner">估驗計價逐項核算工具</div>
+  <h2>它核五件事</h2>
+  <div class="list">
+    <div class="row"><div class="k">1</div><h3>單價 × 數量 ＝ 複價</h3><p>每一列逐項核對</p></div>
+    <div class="row"><div class="k">2</div><h3>前期＋本期＝累計</h3><p>同一份檔案內部一致</p></div>
+    <div class="row"><div class="k">3</div><h3>跨期銜接</h3><p>前一期累計至本期 ＝ 本期前期累計</p></div>
+    <div class="row"><div class="k">4</div><h3>小計反查</h3><p>小計 ＝ 底下子項加起來</p></div>
+    <div class="row"><div class="k">5</div><h3>畫面顯示比對</h3><p>兩期同一個數字，畫面上長得一不一樣</p></div>
+  </div>
+</section>
+
+<!-- 四種狀況 -->
+<section class="card" id="c05">
+  <div class="corner">估驗計價逐項核算工具</div>
+  <h2>它抓得到的四種常見狀況</h2>
+  <div class="cases">
+    <div class="case v"><span class="lab">A　數字不同</span><h3>前一期改了，本期沒改</h3><p>跨期銜接對不起來</p></div>
+    <div class="case v"><span class="lab">B　數字不同</span><h3>公式被打成固定數字</h3><p>前期＋本期不等於累計</p></div>
+    <div class="case f"><span class="lab">C　格式不同</span><h3>數字一樣，畫面不一樣</h3><p>統一小數位數就好</p></div>
+    <div class="case s"><span class="lab">D　略過未檢查</span><h3>沒核到的會老實標出</h3><p>不是核過沒問題</p></div>
+  </div>
+</section>
+
+<!-- 第二段轉場：三個動作 -->
+<section class="card dark" id="c06">
+  <div class="eyebrow">第二段</div>
+  <h1>怎麼用？三個動作</h1>
+  <div class="bar"></div>
+  <div class="steps">
+    <div class="step"><i>1</i>準備兩份檔案</div><span class="to">→</span>
+    <div class="step"><i>2</i>說一句話</div><span class="to">→</span>
+    <div class="step"><i>3</i>看結論</div>
+  </div>
+</section>
+
+<!-- r01 安裝完成（取代 PowerShell 錄影；訊息照 setup.ps1 實際輸出） -->
+<section class="card" id="r01">
+  <div class="corner">第一次使用：安裝</div>
+  <h2>執行後看到「安裝完成！」就好了</h2>
+  <div class="term">
+    <div class="tb">Windows PowerShell</div>
+<pre>PS&gt; cd D:\320code\material-price-payment
+PS&gt; .\setup.ps1
+<span class="y">[1/3] 安裝 Python 依賴...</span>      <span class="g">v openpyxl 已安裝</span>
+<span class="y">[2/3] 跑內建測試...</span>          <span class="g">v 測試全綠</span>
+<span class="y">[3/3] 安裝 Claude Code skill ...</span> <span class="g">v 已安裝</span>
+
+<span class="hi">安裝完成！重啟 Claude Code，輸入「核對估驗計價」即可使用。</span></pre>
+  </div>
+  <div class="keynote">最後把 Claude Code 關掉重開</div>
+</section>
+
+<!-- r02 練習檔位置（取代檔案總管錄影） -->
+<section class="card" id="r02">
+  <div class="corner">動作一：準備兩份檔案</div>
+  <h2>練習檔在這裡</h2>
+  <div class="folder">
+    <div class="path">D:\320code\material-price-payment\examples\</div>
+    <div class="f"><div class="ic">X</div>練習用-第一期估驗計價.xlsx<small>前一期</small></div>
+    <div class="f"><div class="ic">X</div>練習用-第二期估驗計價.xlsx<small>本期</small></div>
+  </div>
+  <div class="keynote">假資料，故意埋了幾種常見錯誤<small>可以放心亂試</small></div>
+</section>
+
+<!-- r03 Claude Code 對話（取代對話錄影；結果為練習檔實際核算結果） -->
+<section class="card" id="r03">
+  <div class="corner">動作二：說一句話</div>
+  <h2>貼上、送出，它自己跑核算</h2>
+  <div class="chat">
+    <div class="bub me"><b class="who">你</b>幫我核對估驗計價。前一期是 …\examples\練習用-第一期估驗計價.xlsx，本期是 …\examples\練習用-第二期估驗計價.xlsx。請款明細表和計價總表都要核，並產生核算報告。</div>
+    <div class="bub ai"><b class="who">Claude</b>兩張分頁各跑一次核算程式：
+      <div class="res">請款明細表：<em>共發現 4 筆異常</em></div>
+      <div class="res">計價總表：<em>共發現 8 筆異常＋2 項略過未檢查</em></div>
+      核算報告存在前一期檔案旁邊，每張分頁一份。</div>
+  </div>
+</section>
+
+<!-- r04 Ctrl+`（取代 Excel 錄影） -->
+<section class="card" id="r04">
+  <div class="corner">狀況 B</div>
+  <h2 class="center">一次看整張表的公式</h2>
+  <div class="keys"><div class="key">Ctrl</div><div class="plus">＋</div><div class="key hl">～</div></div>
+  <div class="keynote">就是數字 1 左邊、印著「～」的那個鍵<small>按一次顯示公式，再按一次切回來；= 開頭的才是公式</small></div>
+</section>
+
+<!-- r05 Ctrl+1（取代 Excel 錄影） -->
+<section class="card" id="r05">
+  <div class="corner">狀況 C</div>
+  <h2 class="center">統一小數位數</h2>
+  <div class="keys"><div class="key">Ctrl</div><div class="plus">＋</div><div class="key hl">1</div></div>
+  <div class="menu"><div class="box">選那一格</div><div class="to">→</div><div class="box">Ctrl＋1</div><div class="to">→</div><div class="box">數值</div><div class="to">→</div><div class="box ok">小數位數</div></div>
+  <div class="keynote">兩期同一欄，設成一樣</div>
+</section>
+
+<!-- 準備檔案三注意 -->
+<section class="card" id="c07">
+  <div class="corner">動作一：準備兩份檔案</div>
+  <h2>準備檔案，注意三件事</h2>
+  <div class="tips">
+    <div class="tip"><i>1</i>兩個檔案先關掉</div>
+    <div class="tip"><i>2</i>檔名開頭放日期，一眼看出誰先誰後</div>
+    <div class="tip"><i>3</i>請款明細表、計價總表，兩張都要核</div>
+  </div>
+</section>
+
+<!-- 順序警告 -->
+<section class="card" id="c08">
+  <div class="corner">動作二：說一句話</div>
+  <h2 class="center">最重要的一句</h2>
+  <div class="alert">
+    <div class="big">前一期在前<br>本期在後</div>
+    <p>順序反了，跨期比對會整個錯</p>
+  </div>
+</section>
+
+<!-- 同一個原因 -->
+<section class="card" id="c09">
+  <div class="corner">動作三：看結論</div>
+  <h2 class="center">好幾筆異常，常常是同一個原因</h2>
+  <div class="eq">
+    <div><div class="num">8 筆</div><small>計價總表異常</small></div>
+    <div>＝</div>
+    <div><div class="num g">3 個</div><small>真正的原因</small></div>
+    <div>＋</div>
+    <div><div class="num y">1 項</div><small>沒核到</small></div>
+  </div>
+</section>
+
+<!-- 略過 ≠ 沒問題 -->
+<section class="card" id="c10">
+  <div class="corner">狀況 D</div>
+  <h2 class="center">出現「略過未檢查」</h2>
+  <div class="alert">
+    <div class="big">略過 ≠ 核過沒問題</div>
+    <p>這一項請人工抽查，或以請款明細表的結果為準</p>
+  </div>
+  <div class="nocheck">另外也不核：營業稅、品管費、利潤、保險等百分比費用列；變更設計欄；手動加總的小計<br>這些請人工驗算</div>
+</section>
+
+<!-- 改完重跑 -->
+<section class="card" id="c11">
+  <div class="corner">改完重跑</div>
+  <h2 class="center">改完一定重跑</h2>
+  <div class="flow">
+    <div class="box">Excel 修正<small>存檔</small></div>
+    <div class="to">→</div>
+    <div class="box">再核一次<small>同一句話</small></div>
+    <div class="to">→</div>
+    <div class="box ok">全數正確<small>而且沒有略過項目</small></div>
+  </div>
+</section>
+
+<!-- 第三段：今天學到什麼 -->
+<section class="card" id="c12">
+  <div class="corner">第三段</div>
+  <h2>今天學到什麼</h2>
+  <div class="list">
+    <div class="row"><div class="k">1</div><h3>能做什麼</h3><p>五項檢查：乘法、加總、跨期、小計、畫面顯示</p></div>
+    <div class="row"><div class="k">2</div><h3>怎麼用</h3><p>準備兩份檔案 → 說一句話 → 看結論，前一期放前面</p></div>
+    <div class="row"><div class="k">3</div><h3>四種狀況</h3><p>沒同步、公式被蓋、只是格式、略過沒核到</p></div>
+    <div class="row"><div class="k">4</div><h3>改完重跑</h3><p>直到全數正確、沒有略過項目</p></div>
+  </div>
+</section>
+
+<!-- 收尾 -->
+<section class="card dark" id="c13">
+  <div class="eyebrow">先用練習檔跑一遍，再用在真的案子</div>
+  <h1>估驗計價<br>逐項核算工具</h1>
+  <div class="bar"></div>
+  <div class="tagline">手冊：docs 資料夾裡的<b>「快速上手」</b></div>
+  <div class="url">github.com/AImaster888/material-price-payment</div>
+</section>
+
+<!-- ===== 實際操作篇 ===== -->
+<section class="card dark" id="o01">
+  <div class="eyebrow">實際操作篇</div>
+  <h1>估驗計價核算<br>動手跑一次</h1>
+  <div class="bar"></div>
+  <div class="tagline">從打開 Claude，到拿到<b>核算結果</b></div>
+  <div class="foot">Claude Code 桌面 App｜用練習檔示範</div>
+</section>
+
+<section class="card dark" id="o02">
+  <div class="eyebrow">一共四步</div>
+  <h1>四個步驟</h1>
+  <div class="bar"></div>
+  <div class="steps">
+    <div class="step"><i>1</i>開啟 Claude Code</div><span class="to">→</span>
+    <div class="step"><i>2</i>開啟技能</div><span class="to">→</span>
+    <div class="step"><i>3</i>貼上送出</div><span class="to">→</span>
+    <div class="step"><i>4</i>看結果</div>
+  </div>
+</section>
+
+<section class="card op" id="o03">
+  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <h2>打開 Claude 桌面程式，點上方的「Code」</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on mark">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div></div><div class="main"><div class="msgs"></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
+</section>
+
+<section class="card op" id="o04">
+  <div class="stepbar"><span class="on">1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <h2>按「新工作階段」，資料夾選這個</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new mark">＋ 新工作階段</div></div><div class="main"><div class="pick"><h4>選擇資料夾</h4><div class="row2">D:\320code\</div><div class="row2 on">D:\320code\material-price-payment</div><div class="row2">D:\2ndbrain\</div></div></div></div></div>
+</section>
+
+<section class="card op" id="o05">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <h2>在輸入框打「/」，點 material-price-payment</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"></div><div class="input mark">/material<span class="cur"></span><div class="pop"><div class="on"><b>/material-price-payment</b>估驗計價逐項核算工具</div><div><b>/markitdown-convert</b>轉 Markdown</div></div></div></div></div></div>
+</section>
+
+<section class="card" id="o06">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span class="on">2 開啟技能</span><span>3 貼上送出</span><span>4 看結果</span></div>
+  <h2 class="center">開啟技能，兩種方法都可以</h2>
+  <div class="opt">
+    <div class="side2"><span class="lab">方法一　打斜線</span><div class="big2">/material-price-payment</div><p>從清單點選，最直接</p></div>
+    <div class="side2"><span class="lab">方法二　直接說</span><div class="big2">「核對估驗計價」</div><p>說到「核對估驗計價」「跨期比對」這類關鍵字，技能會自己啟動</p></div>
+  </div>
+</section>
+
+<section class="card op" id="o07">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <h2>貼上手冊那段話，按 Enter 送出</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"></div><div class="input mark">幫我核對估驗計價。前一期是 D:\320code\material-price-payment\examples\練習用-第一期估驗計價.xlsx，本期是 D:\320code\material-price-payment\examples\練習用-第二期估驗計價.xlsx。請款明細表和計價總表都要核，並產生核算報告。</div></div></div></div>
+</section>
+
+<section class="card op" id="o08">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <h2>跳出詢問時，按「允許」</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="a">好的，先核對「請款明細表」，前一期在前、本期在後。</div></div><div class="ask"><div class="q">要讓 Claude 執行這個指令嗎？</div><div class="cmd">python verify_payment.py "練習用-第一期估驗計價.xlsx" "練習用-第二期估驗計價.xlsx" --sheet 請款明細表 --md</div><div class="btns"><span class="yes">允許</span><span>拒絕</span></div></div></div></div></div>
+</section>
+
+<section class="card op" id="o09">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span class="on">3 貼上送出</span><span>4 看結果</span></div>
+  <h2>它會自己跑，兩張分頁各一次</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="tool">▶ verify_payment.py … --sheet 請款明細表 --md　　完成</div><div class="tool">▶ verify_payment.py … --sheet 計價總表 --md　　執行中…</div></div><div class="input"><span class="ph">稍等一下…</span></div></div></div></div>
+</section>
+
+<section class="card op" id="o10">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <h2>先看結論那一句</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="u">幫我核對估驗計價。前一期是 …練習用-第一期估驗計價.xlsx，本期是 …練習用-第二期估驗計價.xlsx。…</div><div class="a"><b>核算完成：</b><br>請款明細表：<em>共發現 4 筆異常</em>（物價調整金額沒同步，連帶總計）<br>計價總表：<em>共發現 8 筆異常＋2 項略過未檢查</em><br>核算報告存在前一期檔案旁邊，每張分頁一份。</div></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
+</section>
+
+<section class="card op" id="o11">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <h2>核算報告存在前一期檔案旁邊</h2>
+  <div class="folder" style="margin-top:40px">
+    <div class="path">D:\320code\material-price-payment\examples\</div>
+    <div class="f"><div class="ic">X</div>練習用-第一期估驗計價.xlsx<small>前一期</small></div>
+    <div class="f"><div class="ic">X</div>練習用-第二期估驗計價.xlsx<small>本期</small></div>
+    <div class="f"><div class="ic" style="background:#2c4a66">M</div>練習用-第一期估驗計價-請款明細表-核算報告.md<small>新產生</small></div>
+    <div class="f"><div class="ic" style="background:#2c4a66">M</div>練習用-第一期估驗計價-計價總表-核算報告.md<small>新產生</small></div>
+  </div>
+</section>
+
+<section class="card op" id="o12">
+  <div class="stepbar"><span>1 開啟 Claude Code</span><span>2 開啟技能</span><span>3 貼上送出</span><span class="on">4 看結果</span></div>
+  <h2>看不懂就直接問</h2>
+  <div class="app"><div class="tb"><span class="dot"></span><span class="dot"></span><span class="dot"></span><div class="tabs"><span>Chat</span><span class="on">Code</span></div></div><div class="body"><div class="side"><div class="new">＋ 新工作階段</div><p>估驗計價核對</p></div><div class="main"><div class="msgs"><div class="a"><b>核算完成：</b><br>請款明細表：<em>共發現 4 筆異常</em>（物價調整金額沒同步，連帶總計）<br>計價總表：<em>共發現 8 筆異常＋2 項略過未檢查</em><br>核算報告存在前一期檔案旁邊，每張分頁一份。</div><div class="u">物價調整金額那筆是什麼原因？要怎麼改？</div><div class="a">前一期累計是 <b>12,000</b>，本期的前期累計還是修正前的 <b>12,500</b>，總計也跟著差 500，是同一個原因。<br>先確認前一期的數字是對的，再把本期「前期累計」改成 12,000，請款明細表和計價總表兩張都要改。</div></div><div class="input"><span class="ph">輸入訊息…</span></div></div></div></div>
+</section>
+
+<section class="card dark" id="o13">
+  <div class="eyebrow">複習</div>
+  <h1>四步跑完一次核算</h1>
+  <div class="bar"></div>
+  <div class="steps">
+    <div class="step"><i>1</i>開啟 Claude Code</div><span class="to">→</span>
+    <div class="step"><i>2</i>開啟技能</div><span class="to">→</span>
+    <div class="step"><i>3</i>貼上送出</div><span class="to">→</span>
+    <div class="step"><i>4</i>看結果</div>
+  </div>
+  <div class="foot">異常怎麼判斷、怎麼改：請看完整版教學影片</div>
+</section>
+
+</body>
+</html>

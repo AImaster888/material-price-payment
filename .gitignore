@@ -23,3 +23,6 @@ __pycache__/
 
 _tmp_*
 *.bak-*
+
+# 影片字卡 PNG 由 docs/影片素材/render_cards.py 從 字卡.html 產生，不進版控
+docs/影片素材/字卡/
